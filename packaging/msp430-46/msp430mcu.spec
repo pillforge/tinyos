@@ -5,6 +5,7 @@ Release: %{release}
 License: GNU GPL
 Packager: Razvan Musaloiu-E. <razvan@musaloiu.com>
 Group: Development/Tools
+BuildRoot: %{_builddir}/%{name}-%{version}-%{release}.%{_arch}
 
 %description
 
@@ -18,4 +19,5 @@ rsync -a %{prefix} %{buildroot}
 )
 
 %files
+%defattr(-,root,root)
 /usr

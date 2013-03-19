@@ -43,7 +43,7 @@ BUILD_ROOT=$(pwd)
 DEB_DEST=usr
 CODENAME=msp430-46
 REL=LTS
-MAKE_J=-j8
+#MAKE_J=-j8
 
 if [[ -z "${TOSROOT}" ]]; then
     TOSROOT=$(pwd)/../../../..

@@ -5,6 +5,7 @@ Release: %{release}
 License: GNU GPL
 Packager: Eric B. Decker <cire831@gmail.com>
 Group: Development/Tools
+BuildRoot: %{_builddir}/%{name}-%{version}-%{release}.%{_arch}
 
 %description
 
@@ -12,4 +13,5 @@ Group: Development/Tools
 rsync -a %{prefix} %{buildroot}
 
 %files
+%defattr(-,root,root)
 /usr

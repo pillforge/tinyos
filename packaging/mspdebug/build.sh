@@ -20,7 +20,7 @@ BUILD_ROOT=$(pwd)
 
 DEB_DEST=usr
 CODENAME=squeeze
-MAKE_J=-j8
+#MAKE_J=-j8
 
 if [[ -z "${TOSROOT}" ]]; then
     TOSROOT=$(pwd)/../../../..
