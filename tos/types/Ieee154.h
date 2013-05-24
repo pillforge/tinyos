@@ -61,46 +61,9 @@ typedef struct {
 #define i_saddr ieee_addr.saddr
 #define i_laddr ieee_addr.laddr
 
-#ifdef notdef
-/*
- * The intent was to consolidate all ieee154 packet definitions
- * in this file.  However a couple of things got in the way.
- *
- * 1) when compiling with blip, for some reason the compile blows
- *    up on the nx_struct ieee154_simple_header_t definition below.
- *    Did look at the resultant C code generated and wasn't able to
- *    figure it out.
- *
- * 2) Miklos is starting a new addressing mechanism for both 16 and
- *    64 bit ieee154 addresses using accessors and packer routines.
- *    That renders this whole thing moot so why bother changing code
- *    to consolidate.
- */
-typedef nx_struct ieee154_simple_header_t {
-  nxle_uint16_t fcf;
-  nxle_uint8_t  dsn;
-  nxle_uint16_t destpan;
-  nxle_uint16_t dest;
-  nxle_uint16_t src;
-} ieee154_simple_header_t;
-
-typedef nx_struct ieee154_fcf_t {
-  nxle_uint16_t frame_type: 3;
-  nxle_uint16_t security_enabled: 1;
-  nxle_uint16_t frame_pending: 1;
-  nxle_uint16_t ack_request: 1;
-  nxle_uint16_t pan_id_compression: 1;
-  nxle_uint16_t _reserved: 3;
-  nxle_uint16_t dest_addr_mode: 2;
-  nxle_uint16_t frame_version: 2;
-  nxle_uint16_t src_addr_mode: 2;
-} ieee154_fcf_t;
-#endif
-
 enum {
   IEEE154_BROADCAST_ADDR = 0xffff,
-  IEEE154_BROADCAST_PAN  = 0xffff,
-  IEEE154_LINK_MTU       = 127,
+  IEEE154_LINK_MTU   = 127,
 };
 
 struct ieee154_frame_addr {
@@ -113,17 +76,15 @@ enum {
   IEEE154_MIN_HDR_SZ = 6,
 };
 
-#ifdef notdef
-
-// deprecated   (does anyone use these?)
-
+#if 0
 struct ieee154_header_base {
   uint8_t length;
   uint16_t fcf;
   uint8_t dsn;
   uint16_t destpan;
 } __attribute__((packed));
-#endif	/* notdef */
+#else
+#endif
 
 enum ieee154_fcf_enums {
   IEEE154_FCF_FRAME_TYPE = 0,
@@ -150,19 +111,4 @@ enum ieee154_fcf_addr_mode_enums {
   IEEE154_ADDR_MASK = 3,
 };
 
-#ifndef DEFINED_TOS_IEEE154_PAN_ID
-// NB: Matches default ActiveMessage group
-#define DEFINED_TOS_IEEE154_PAN_ID 22
-#endif // DEFINED_TOS_IEEE154_PAN_ID
-
-#ifndef DEFINED_TOS_IEEE154_SHORT_ADDRESS
-// NB: Matches default ActiveMessage address
-#define DEFINED_TOS_IEEE154_SHORT_ADDRESS 1
-#endif // DEFINED_TOS_IEEE154_SHORT_ADDRESS
-
-enum {
-  TOS_IEEE154_SHORT_ADDRESS = DEFINED_TOS_IEEE154_SHORT_ADDRESS,
-  TOS_IEEE154_PAN_ID = DEFINED_TOS_IEEE154_PAN_ID,
-};
-
-#endif	/* __IEEE154_H__ */
+#endif
