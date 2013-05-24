@@ -1,0 +1,110 @@
+This directory has files that makes using gdb easier with the msp430.
+
+So one is debugging the <blah> application located in apps/<blah>.
+
+For the purpose of this tutorial, let's build for the z1 platform.  The
+z1 uses a msp430f2617 processor which belongs to the x2 family.  This will
+be needed when deciding which cpu specific gdb support file to use.
+
+First one must build the application with debugging information.  This can
+be done using either "make debug z1" or "make debugopt z1".  The later is
+preferred because it optimizes as well as including debugging information.
+
+Debugging is done via a jtag port connected to a gdb server that implements
+the remote gdb protocol.  Older toolchains supplied msp430-jtag for
+manipulating the jtag port and msp430-gdbproxy for the gdb server.   The
+problem with these older tools is they only handle early TI processors
+and are not open source so can not be easily extended for the newer
+processors.   These two tools have been replaced by mspdebug which is
+open source.  Mspdebug works well for the x5 processors but is somewhat
+flakey for the x2.
+
+GDB can execute gdb run commands from the execution directory and your home
+directory.  These files are named .gdbinit.  The init file in the build
+directory is build/z1/.gdbinit.    But keep in mind that if one does a "make
+clean" it wipes out build and everything below it.  So the thing to do is
+place the .gdbinit file and friends in the apps/<blah> directory and link
+from build/z1.   See below.
+
+CPU dependent gdb command files are also available for the various flavors
+of msp430 cpus.   Sourcing one of these files will make available various
+commands for looking at different parts of the processor.  They need to be
+in apps/<blah> for the same reason as gdbinit.
+
+To set up the application directory, apps/<blah> do the following:
+	(assuming in the top level of the tinyos root)
+
+    cd apps/<blah>
+    cp ../../tos/chips/msp430/99_gdb/gdbinit ./.gdbinit
+    cp ../../tos/chips/msp430/99_gdb/gdb_x2  ./.gdb_x2
+    make debugopt z1 && mspdebug uif -qjd /dev/ttyUSB0 --force-reset \
+	    \"prog build/z1/main.exe\"
+
+The --force-reset make mspdebug behave better with x2 processors.   Your
+mileage may vary.
+
+now that the build directory exists, we can finish preping the gdb files.
+
+    cd build/z1
+    ln -s ../../gdbinit
+
+Fire up the gdb server.   Probably from another terminal window.
+
+    mspdebug uif -qjd /dev/ttyUSB0 "opt gdb_loop true" gdb
+
+And connect to the beasty using gdb.   From the apps/<blah> directory:
+
+    msp430-gdb build/z1/main.exe
+
+Emacs also has a nice interface to all of this including a source level
+debugging mechanism.  From within emacs use M-x gdb and then
+
+    Run gdb (like this): msp430-gdb --annotate=3 build/z1/main.exe
+
+
+Slow Debugging:  (from David Brown, <david@westcontrol.com>, thanks David)
+
+By default, gdb considers all memory areas to be non-cached (i.e., it
+reads them from the hardware every time it wants to show them) and uses
+native sized accesses.  This means that if it wants to read code, such
+as to show the disassembly window, it has to do an awful lot of 2-byte
+reads from the chip - often reading the same address several times.  As
+there is a certain latency for each read, this can mean long delays
+while everything is read and re-read (you can see this on the output of
+mspdebug).
+
+The way to avoid this is by memory regions.  In the gdb setup, include
+several lines about memory:
+
+
+set remoteaddresssize 64
+set remotetimeout 999999
+set remote memory-write-packet-size 2048
+set remote memory-write-packet-size fixed
+set remote memory-read-packet-size 2048
+set remote memory-read-packet-size fixed
+
+set mem inaccessible-by-default off
+mem 0x2100 0x100000 ro 64 cache
+
+
+The exact range for the "ro 64 cache" memory area will depend on the
+chip you use, but it should cover the code flash.  gdb will then know
+that it can use 64-byte reads in this area, and can remember the results
+- substantially cutting down on extra reads.
+
+
+x1 family: 0x0c00 - 0x0fff	boot memory (rom)
+(1611)	   0x1000 - 0x10ff	info memory (rom)
+	   0x1100 - 0x38ff	ram (10k)
+	   0x4000 - 0xffff	rom (48k)
+
+x2 family: 0x00c00 - 0x00fff	boot memory (rom)
+(2618)	   0x01000 - 0x010ff	info memory (rom)
+	   0x01100 - 0x030ff	ram (8k)
+	   0x03100 - 0x1ffff	rom (116k)
+
+x5 family: 0x01000 - 0x017ff	boot memory (rom) 2k
+(5438a)	   0x01800 - 0x019ff	info memory (rom) 1k
+	   0x01c00 - 0x05bff	ram (16k)
+	   0x05c00 - 0x45bff	rom (256k)

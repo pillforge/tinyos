@@ -1,0 +1,9 @@
+#-*-Makefile-*- vim:syntax=make
+
+PLATFORM = exp430
+MSP_MCU = msp430f5529
+
+$(call TOSMake_include_platform,msp)
+
+exp430: $(BUILD_DEPS)
+	@:

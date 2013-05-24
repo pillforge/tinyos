@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2011 Eric B. Decker
  * Copyright (c) 2008-2010 The Regents of the University  of California.
  * All rights reserved.
  *
@@ -34,7 +35,8 @@
 
  /*
  * @author Stephen Dawson-Haggerty <stevedh@eecs.berkeley.edu>
- * @version $Revision: 1.1 $ $Date: 2009/08/19 17:54:35 $
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
+ * @author Eric B. Decker <cire831@gmail.com>
  */
 
 #ifndef __IEEE154_H__
@@ -55,6 +57,7 @@ typedef struct {
     ieee154_laddr_t laddr;
   } ieee_addr;
 } ieee154_addr_t;
+
 #define i_saddr ieee_addr.saddr
 #define i_laddr ieee_addr.laddr
 
@@ -64,8 +67,8 @@ enum {
 };
 
 struct ieee154_frame_addr {
-  ieee154_addr_t ieee_src;
-  ieee154_addr_t ieee_dst;
+  ieee154_addr_t  ieee_src;
+  ieee154_addr_t  ieee_dst;
   ieee154_panid_t ieee_dstpan;
 };
 

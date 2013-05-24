@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2013 Eric B. Decker
  * Copyright (c) 2010-2011 Eric B. Decker
  * Copyright (c) 2009 DEXMA SENSORS SL
  * Copyright (c) 2005-2006 Arch Rock Corporation
@@ -54,7 +55,6 @@ generic module Msp430UartP() {
     interface HplMsp430UsciA as Usci;
     interface HplMsp430UsciInterrupts as UsciInterrupts[ uint8_t id ];
     interface Counter<T32khz,uint16_t>;
-    interface Leds;
   }
 }
 
@@ -62,7 +62,7 @@ implementation {
   norace uint16_t m_tx_len, m_rx_len;
   norace uint8_t * COUNT_NOK(m_tx_len) m_tx_buf, * COUNT_NOK(m_rx_len) m_rx_buf;
   norace uint16_t m_tx_pos, m_rx_pos;
-  norace uint8_t m_byte_time;
+  norace uint8_t m_byte_time;		/* kludge doesn't work */
   norace uint8_t current_owner;
 
   async command error_t Resource.immediateRequest[ uint8_t id ]() {
@@ -73,7 +73,7 @@ implementation {
     return call UsciResource.request[ id ]();
   }
 
-  async command uint8_t Resource.isOwner[ uint8_t id ]() {
+  async command bool Resource.isOwner[ uint8_t id ]() {
     return call UsciResource.isOwner[ id ]();
   }
 
@@ -85,17 +85,22 @@ implementation {
     return call UsciResource.release[ id ]();
   }
 
+  /*
+   * this m_byte_time kludge is broken
+   */
   async command void ResourceConfigure.configure[ uint8_t id ]() {
-    msp430_uart_union_config_t* config = call Msp430UartConfigure.getConfig[id]();
-    m_byte_time = config->uartConfig.ubr / 2; //pot donar problemes
+    const msp430_uart_union_config_t* config = call Msp430UartConfigure.getConfig[id]();
+    m_byte_time = config->uartConfig.ubr / 2;
+    if (!m_byte_time)
+      m_byte_time = 1;
     call Usci.setModeUart(config);
     call Usci.enableIntr();
   }
 
   async command void ResourceConfigure.unconfigure[ uint8_t id ]() {
-    call Usci.resetUsci(TRUE);
-    call Usci.disableIntr();
+    call Usci.resetUsci_n();		/* also turns off interrupt enables */
     call Usci.disableUart();
+    /* leave in reset */
   }
 
   event void UsciResource.granted[ uint8_t id ]() {
@@ -189,6 +194,12 @@ implementation {
     return SUCCESS;
   }
 
+  async command bool UartByte.sendAvail[ uint8_t id ]() {
+    if (call UsciResource.isOwner[id]() == FALSE)
+      return FALSE;
+    return (call Usci.isTxIntrPending());
+  }
+
   async command error_t UartByte.receive[ uint8_t id ]( uint8_t* byte, uint8_t timeout ) {
     uint16_t timeout_micro = m_byte_time * timeout + 1;
     uint16_t start;
@@ -204,14 +215,20 @@ implementation {
     return SUCCESS;
   }
 
+  async command bool UartByte.receiveAvail[ uint8_t id ]() {
+    if (call UsciResource.isOwner[id]() == FALSE)
+      return FALSE;
+    return (call Usci.isRxIntrPending());
+  }
+
   async event void Counter.overflow() {}
 
-  default async command error_t UsciResource.isOwner[ uint8_t id ]() { return FAIL; }
+  default async command bool    UsciResource.isOwner[ uint8_t id ]() { return FALSE; }
   default async command error_t UsciResource.request[ uint8_t id ]() { return FAIL; }
   default async command error_t UsciResource.immediateRequest[ uint8_t id ]() { return FAIL; }
   default async command error_t UsciResource.release[ uint8_t id ]() { return FAIL; }
-  default async command msp430_uart_union_config_t* Msp430UartConfigure.getConfig[uint8_t id]() {
-    return (msp430_uart_union_config_t *) &msp430_uart_default_config;
+  default async command const msp430_uart_union_config_t* Msp430UartConfigure.getConfig[uint8_t id]() {
+    return &msp430_uart_default_config;
   }
 
   default event void Resource.granted[ uint8_t id ]() {}

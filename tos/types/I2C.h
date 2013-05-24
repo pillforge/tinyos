@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2005-2006 Arch Rock Corporation
+ * Copyright (c) 2012, Eric B. Decker
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +17,7 @@
  *   from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
  * FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
  * ARCHED ROCK OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -32,6 +33,7 @@
 /**
  * @author Phil Buonadonna
  * @author Philip Levis
+ * @author Eric B. Decker <cire831@gmail.com>
  */
 
 #ifndef _I2C_H

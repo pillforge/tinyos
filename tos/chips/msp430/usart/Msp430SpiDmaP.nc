@@ -1,4 +1,5 @@
 /**
+ * Copyright (c) 2013 Eric B. Decker
  * Copyright (c) 2005-2006 Arched Rock Corporation
  * All rights reserved.
  *
@@ -33,9 +34,10 @@
  * @author Jonathan Hui <jhui@archedrock.com>
  * @author Mark Hays
  * @author Roman Lim
- * @version $Revision: 1.6 $ $Date: 2008-02-28 17:28:12 $
+ * @author Eric B. Decker <cire831@gmail.com>
  */
 
+#include "Msp430Dma.h"
 
 generic module Msp430SpiDmaP( uint16_t IFG_addr,
 			      uint16_t TXBUF_addr,
@@ -92,7 +94,7 @@ implementation {
   async command void ResourceConfigure.unconfigure[ uint8_t id ]() {
     call Usart.resetUsart(TRUE);
     call Usart.disableSpi();
-    call Usart.resetUsart(FALSE);
+    /* leave in reset */
   }
 
   event void UsartResource.granted[ uint8_t id ]() {
@@ -107,7 +109,7 @@ implementation {
   default async command error_t UsartResource.request[ uint8_t id ]() { return FAIL; }
   default async command error_t UsartResource.immediateRequest[ uint8_t id ]() { return FAIL; }
   default async command error_t UsartResource.release[ uint8_t id ]() { return FAIL; }
-  default async command msp430_spi_union_config_t* Msp430SpiConfigure.getConfig[uint8_t id]() {
+  default async command const msp430_spi_union_config_t* Msp430SpiConfigure.getConfig[uint8_t id]() {
     return &msp430_spi_default_config;
   }
 
@@ -138,34 +140,29 @@ implementation {
       IFG &= ~( TXIFG | RXIFG );
 
       // set up the RX xfer
-      call DmaChannel1.setupTransfer(DMA_SINGLE_TRANSFER,
-				     RXTRIG,
-				     DMA_EDGE_SENSITIVE,
-				     (void *) RXBUF_addr,
-				     rx_buf ? rx_buf : &m_dump,
-				     len,
-				     DMA_BYTE,
-				     DMA_BYTE,
-				     DMA_ADDRESS_UNCHANGED,
-				     rx_buf ?
-				       DMA_ADDRESS_INCREMENTED :
-				       DMA_ADDRESS_UNCHANGED);
-      // this doesn't start a transfer; it simply enables the channel
-      call DmaChannel1.startTransfer();
+      call DmaChannel1.setupTransfer(
+	  DMA_DT_SINGLE |		// single, edge triggered
+	  DMA_SB_DB |			// byte to byte
+	  DMA_SRC_NO_CHNG |		// src rxbuf, no inc
+	  (rx_buf ? DMA_DST_INC : DMA_DST_NO_CHNG),
+					// if buf inc, else dumping
+	RXTRIG,				// specified trigger
+	(uint16_t) RXBUF_addr,
+	(uint16_t) (rx_buf ? rx_buf : &m_dump),
+	len);
+      call DmaChannel1.enableDma();
 
       // set up the TX xfer
-      call DmaChannel2.setupTransfer(DMA_SINGLE_TRANSFER,
-				     TXTRIG,
-				     DMA_EDGE_SENSITIVE,
-				     tx_buf,
-				     (void *) TXBUF_addr,
-				     len,
-				     DMA_BYTE,
-				     DMA_BYTE,
-				     DMA_ADDRESS_INCREMENTED,
-				     DMA_ADDRESS_UNCHANGED);
-      // this doesn't start a transfer; it simply enables the channel
-      call DmaChannel2.startTransfer();
+      call DmaChannel2.setupTransfer(
+	  DMA_DT_SINGLE |		// single, edge triggered
+	  DMA_SB_DB |			// byte to byte
+	  DMA_SRC_INC |			// src tx_buf, inc
+	  DMA_DST_NO_CHNG,		// dst, TXBUF, no inc
+	TXTRIG,				// specified trigger
+	(uint16_t) tx_buf,
+	(uint16_t) TXBUF_addr,
+	len);
+      call DmaChannel2.enableDma();
 
       // pong the tx flag to get things rolling
       IFG |= TXIFG;
@@ -181,11 +178,11 @@ implementation {
     atomic signalDone( SUCCESS );
   }
 
-  async event void DmaChannel1.transferDone( error_t error ) {
-    signalDone( error );
+  async event void DmaChannel1.transferDone() {
+    signalDone(SUCCESS);
   }
 
-  async event void DmaChannel2.transferDone( error_t error ) {}
+  async event void DmaChannel2.transferDone() {}
 
   void signalDone( error_t error ) {
     signal SpiPacket.sendDone[ m_client ]( m_tx_buf, m_rx_buf, m_len, error );
