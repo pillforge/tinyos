@@ -129,11 +129,7 @@ implementation {
     will be 0xFF
   */
   async command uint8_t ArbiterInfo.userId() {
-    atomic {
-      if(state != RES_BUSY)
-        return NO_RES;
-      return resId;
-    }
+    return resId;
   }
 
   /**
