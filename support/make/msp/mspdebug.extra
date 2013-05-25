@@ -1,0 +1,26 @@
+#-*-Makefile-*- vim:ft=make
+
+PROGRAM = mspdebug # Not sure if this is needed
+
+# MSP_DEBUG_FLAGS can be used to specify the type of device mspdebug is connected to
+MSP_DEBUG_FLAGS ?= rf2500
+
+ifndef MSP_DEBUG
+MSP_DEBUG = mspdebug
+endif
+
+program: FORCE
+	@echo "    installing $(PLATFORM) binary using mspdebug"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "prog $(INSTALL_IHEX)"
+
+program_no_e: FORCE
+	@echo "    installing $(PLATFORM) binary mspdebug (without mass erase)"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "load $(INSTALL_IHEX)"
+
+program_bl: FORCE
+	@echo "    installing $(PLATFORM) bootloader using mspdebug"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "prog $(BOOTLOADER_IMG)"
+
+program_input: ihex
+	@:
+
