@@ -452,6 +452,100 @@ configuration HplMsp430GeneralIOC {
   provides interface HplMsp430GeneralIO as ADC15;
 
 #endif /* msp430x54x || msp430x54xA */
+/*
+ * x5 family: msp430f5529
+ */
+#if defined(__MSP430F5529)
+  provides interface HplMsp430GeneralIO as TA0CCR0;
+  provides interface HplMsp430GeneralIO as TA0CCR1;
+  provides interface HplMsp430GeneralIO as TA0CCR2;
+  provides interface HplMsp430GeneralIO as TA0CCR3;
+  provides interface HplMsp430GeneralIO as TA0CCR4;
+  provides interface HplMsp430GeneralIO as TA0CLK;
+
+  provides interface HplMsp430GeneralIO as TA1CCR0;
+  provides interface HplMsp430GeneralIO as TA1CCR1;
+  provides interface HplMsp430GeneralIO as TA1CCR2;
+  provides interface HplMsp430GeneralIO as TA1CLK;
+
+  provides interface HplMsp430GeneralIO as TA2CCR0;
+  provides interface HplMsp430GeneralIO as TA2CCR1;
+  provides interface HplMsp430GeneralIO as TA2CCR2;
+  provides interface HplMsp430GeneralIO as TA2CLK;
+
+  provides interface HplMsp430GeneralIO as TB0CCR0;
+  provides interface HplMsp430GeneralIO as TB0CCR1;
+  provides interface HplMsp430GeneralIO as TB0CCR2;
+  provides interface HplMsp430GeneralIO as TB0CCR3;
+  provides interface HplMsp430GeneralIO as TB0CCR4;
+  provides interface HplMsp430GeneralIO as TB0CCR5;
+  provides interface HplMsp430GeneralIO as TB0CCR6;
+  provides interface HplMsp430GeneralIO as TB0CLK;
+  provides interface HplMsp430GeneralIO as TB0OUTH;
+
+  provides interface HplMsp430GeneralIO as RTCCLK;
+  provides interface HplMsp430GeneralIO as MCLK;
+  provides interface HplMsp430GeneralIO as SMCLK;
+  provides interface HplMsp430GeneralIO as ACLK;
+  /*provides interface HplMsp430GeneralIO as ADC12CLK;*/
+  provides interface HplMsp430GeneralIO as DMAE0;
+
+  provides interface HplMsp430GeneralIO as UCA0CLK;
+  provides interface HplMsp430GeneralIO as UCA0STE;
+  provides interface HplMsp430GeneralIO as UCA0TXD;
+  provides interface HplMsp430GeneralIO as UCA0RXD;
+  provides interface HplMsp430GeneralIO as UCA0SIMO;
+  provides interface HplMsp430GeneralIO as UCA0SOMI;
+
+  provides interface HplMsp430GeneralIO as UCB0CLK;
+  provides interface HplMsp430GeneralIO as UCB0STE;
+  provides interface HplMsp430GeneralIO as UCB0SIMO;
+  provides interface HplMsp430GeneralIO as UCB0SOMI;
+  provides interface HplMsp430GeneralIO as UCB0SDA;
+  provides interface HplMsp430GeneralIO as UCB0SCL;
+
+  provides interface HplMsp430GeneralIO as UCA1CLK;
+  provides interface HplMsp430GeneralIO as UCA1STE;
+  provides interface HplMsp430GeneralIO as UCA1TXD;
+  provides interface HplMsp430GeneralIO as UCA1RXD;
+  provides interface HplMsp430GeneralIO as UCA1SIMO;
+  provides interface HplMsp430GeneralIO as UCA1SOMI;
+
+  provides interface HplMsp430GeneralIO as UCB1CLK;
+  provides interface HplMsp430GeneralIO as UCB1STE;
+  provides interface HplMsp430GeneralIO as UCB1SIMO;
+  provides interface HplMsp430GeneralIO as UCB1SOMI;
+  provides interface HplMsp430GeneralIO as UCB1SDA;
+  provides interface HplMsp430GeneralIO as UCB1SCL;
+
+  provides interface HplMsp430GeneralIO as ADC0;
+  provides interface HplMsp430GeneralIO as ADC1;
+  provides interface HplMsp430GeneralIO as ADC2;
+  provides interface HplMsp430GeneralIO as ADC3;
+  provides interface HplMsp430GeneralIO as ADC4;
+  provides interface HplMsp430GeneralIO as ADC5;
+  provides interface HplMsp430GeneralIO as ADC6;
+  provides interface HplMsp430GeneralIO as ADC7;
+
+// A8 and A9 can either be external inputs or connected to Vref/Veref
+// Check your chip for more details.
+
+  provides interface HplMsp430GeneralIO as ADC8;
+  provides interface HplMsp430GeneralIO as ADC9;
+
+// A10 connects internally to Ref_x and A11 (INCHx = 0xB)
+// measures AVcc through a divider network.   There are
+// no external pins associated with ADC10 or ADC11.
+
+  provides interface HplMsp430GeneralIO as ADC12;
+  provides interface HplMsp430GeneralIO as ADC13;
+  provides interface HplMsp430GeneralIO as ADC14;
+  provides interface HplMsp430GeneralIO as ADC15;
+
+  // Supply voltage monitoring
+  provides interface HplMsp430GeneralIO as SVMOUT;
+
+#endif /* MSP430F5529 */
 
 }
 implementation {
@@ -1097,4 +1191,92 @@ implementation {
 #endif
 
 #endif	/* __msp430x54x || __msp430x54xA */
+
+#if defined(__MSP430F5529)
+
+   TA0CCR0 = P11;
+   TA0CCR1 = P12;
+   TA0CCR2 = P13;
+   TA0CCR3 = P14;
+   TA0CCR4 = P15;
+   TA0CLK = P10;
+
+   TA1CCR0 = P17;
+   TA1CCR1 = P20;
+   TA1CCR2 = P21;
+   TA1CLK = P16;
+
+   TA2CCR0 = P23;
+   TA2CCR1 = P24;
+   TA2CCR2 = P25;
+   TA2CLK = P22;
+
+   TB0CCR0 = P56;
+   TB0CCR1 = P57;
+   TB0CCR2 = P74;
+   TB0CCR3 = P75;
+   TB0CCR4 = P76;
+   TB0CCR5 = P35;
+   TB0CCR6 = P36;
+   TB0CLK = P77;
+   TB0OUTH = P37;
+
+   RTCCLK = P26;
+   MCLK = P77;
+   SMCLK = P22;
+   ACLK = P10;
+   // ADC12CLK is on accessable via  the Port Mapping Controller
+   //ADC12CLK = ;
+   DMAE0 = P26;
+
+   UCA0TXD = P33;
+   UCA0RXD = P34;
+   UCA0SIMO = P33;
+   UCA0SOMI = P34;
+   UCA0CLK = P27;
+   UCA0STE = P32;
+
+   UCB0STE = P27;
+   UCB0SIMO = P30;
+   UCB0SOMI = P31;
+   UCB0SDA = P30;
+   UCB0SCL = P31;
+   UCB0CLK = P32;
+
+   UCA1TXD = P44;
+   UCA1RXD = P45;
+   UCA1SIMO = P44;
+   UCA1SOMI = P45;
+   UCA1CLK = P40;
+   UCA1STE = P43;
+
+   UCB1STE = P40;
+   UCB1SIMO = P41;
+   UCB1SOMI = P42;
+   UCB1SDA = P41;
+   UCB1SCL = P42;
+   UCB1CLK = P43;
+
+   ADC0 = P60;
+   ADC1 = P61;
+   ADC2 = P62;
+   ADC3 = P63;
+   ADC4 = P64;
+   ADC5 = P65;
+   ADC6 = P66;
+   ADC7 = P67;
+   ADC8 = P50;
+   ADC9 = P51;
+
+   // there are no ADC's 10 and 11 according to datasheet
+
+   ADC12 = P70;
+   ADC13 = P71;
+   ADC14 = P72;
+   ADC15 = P73;
+
+   SVMOUT = P37;
+
+#endif	/* __MSP430F5529 */
+
 }

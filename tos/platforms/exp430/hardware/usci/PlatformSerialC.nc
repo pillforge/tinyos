@@ -64,7 +64,7 @@ implementation {
   components PlatformSerialP;
   StdControl = PlatformSerialP;
 
-  components new Msp430UsciUartA0C() as UartC;
+  components new Msp430UsciUartA1C() as UartC;
 
   UartStream = UartC;
   UartByte = UartC;

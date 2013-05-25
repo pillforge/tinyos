@@ -10,12 +10,12 @@ for (split(/\n/, <<'EOText'
   %P/hardware/clock
   %P/hardware/leds
   %P/hardware/pins
-  #%P/hardware/usci
+  %P/hardware/usci
 
   %T/chips/msp430/x5xxx
   %T/chips/msp430/x5xxx/lpm
   %T/chips/msp430/x5xxx/timer
-  #%T/chips/msp430/x5xxx/usci
+  %T/chips/msp430/x5xxx/usci
   %T/chips/msp430
   %T/chips/msp430/pins
   %T/chips/msp430/timer
