@@ -108,6 +108,7 @@
  * Stabilization appears to take roughly 150ms.
  *
  * @author Eric B. Decker <cire831@gmail.com>
+ * @author Addisu Z. Taddese <addisu.z.taddese@vanderbilt.edu>
  */
 
 #define noinit  __attribute__ ((section(".noinit"))) 

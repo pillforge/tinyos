@@ -46,6 +46,7 @@ generic configuration Msp430UsciUartA0C() {
     interface UartByte;
     interface Msp430UsciError;
   }
+  uses interface Msp430UsciConfigure[uint8_t client];
 }
 implementation {
   enum {
@@ -59,6 +60,7 @@ implementation {
   UartStream = UartC.UartStream[CLIENT_ID];
   UartByte = UartC.UartByte[CLIENT_ID];
   Msp430UsciError = UartC.Msp430UsciError[CLIENT_ID];
+  Msp430UsciConfigure = UartC.Msp430UsciConfigure;
 
   UsciC.ResourceConfigure[CLIENT_ID] -> UartC.ResourceConfigure[CLIENT_ID];
 }

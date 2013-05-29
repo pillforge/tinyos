@@ -43,7 +43,7 @@
 #ifndef PLATFORM_MESSAGE_H
 #define PLATFORM_MESSAGE_H
 
-#include <CC2420.h>
+//#include <CC2420.h>
 #include <Serial.h>
 
 typedef union message_header {

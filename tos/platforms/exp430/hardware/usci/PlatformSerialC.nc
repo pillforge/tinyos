@@ -48,6 +48,7 @@
  *
  * @author David Moss
  * @author Peter A. Bigot <pab@peoplepowerco.com>
+ * @author Addisu Z. Taddese <addisu.z.taddese@vanderbilt.edu>
  */
 
 configuration PlatformSerialC {
@@ -70,5 +71,6 @@ implementation {
   UartByte = UartC;
   Msp430UsciError = UartC;
   PlatformSerialP.Resource -> UartC.Resource;
+  UartC.Msp430UsciConfigure -> PlatformSerialP.Msp430UsciConfigure;
 
 }
