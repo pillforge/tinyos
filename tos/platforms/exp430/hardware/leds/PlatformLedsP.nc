@@ -136,13 +136,11 @@ implementation {
       } else {
 	call Leds.led1Off();
       }
-#ifdef notdef
       if (val & LEDS_LED2) {
 	call Leds.led2On();
       } else {
 	call Leds.led2Off();
       }
-#endif
     }
   }
 }

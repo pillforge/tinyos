@@ -32,6 +32,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * @author Peter A. Bigot <pab@peoplepowerco.com>
+ * @author Addisu Z. Taddese <addisu.z.taddese@vanderbilt.edu>
  */
 
 #include "hardware.h"
@@ -59,7 +60,7 @@ implementation {
   Led1Impl -> GeneralIOC.Port81;
   PlatformLedsP.Led1 -> Led1Impl;
 
- /* Green LED (D1) at P8.2 */
+  /* Green LED (D1) at P8.2 */
   components new Msp430GpioC() as Led2Impl;
   Led2Impl -> GeneralIOC.Port82;
   PlatformLedsP.Led2 -> Led2Impl;
