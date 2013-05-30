@@ -111,14 +111,14 @@ implementation {
     uint8_t rval;
     atomic {
       rval = 0;
-      if (!call Led0.get()) {
-	rval |= LEDS_LED0;
+      if (call Led0.get()) {
+        rval |= LEDS_LED0;
       }
-      if (!call Led1.get()) {
-	rval |= LEDS_LED1;
+      if (call Led1.get()) {
+        rval |= LEDS_LED1;
       }
-      if (!call Led2.get()) {
-	rval |= LEDS_LED2;
+      if (call Led2.get()) {
+        rval |= LEDS_LED2;
       }
     }
     return rval;
@@ -127,19 +127,19 @@ implementation {
   async command void Leds.set(uint8_t val) {
     atomic {
       if (val & LEDS_LED0) {
-	call Leds.led0On();
+        call Leds.led0On();
       } else {
-	call Leds.led0Off();
+        call Leds.led0Off();
       }
       if (val & LEDS_LED1) {
-	call Leds.led1On();
+        call Leds.led1On();
       } else {
-	call Leds.led1Off();
+        call Leds.led1Off();
       }
       if (val & LEDS_LED2) {
-	call Leds.led2On();
+        call Leds.led2On();
       } else {
-	call Leds.led2Off();
+        call Leds.led2Off();
       }
     }
   }
