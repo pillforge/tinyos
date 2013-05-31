@@ -1,0 +1,29 @@
+# bsl5.extra
+#
+# Uses the python-msp430-tools package to program f5xx family of chips using USB.
+# It installs to the first usb device with 2047:0200 vendor and device ids.
+#
+# Use pip to install python-msp430-tools
+#   pip install python-msp430-tools
+#
+
+PROGRAM = bsl5
+
+MSP_BSL ?= python -m msp430.bsl5.hid
+
+program: FORCE
+	@echo "    installing $(PLATFORM) binary using bsl"
+	$(MSP_BSL) $(MSP_BSL_FLAGS) -r -e -i ihex -P $(INSTALL_IHEX)
+	rm -f $(subst .ihex.,.exe.,$(INSTALL_IHEX)) $(INSTALL_IHEX)
+
+program_no_e:FORCE
+	@echo "    installing $(PLATFORM) binary using bsl (without mass erase)"
+	$(MSP_BSL) $(MSP_BSL_FLAGS) -r -i ihex -P $(INSTALL_IHEX)
+	rm -f $(subst .ihex.,.exe.,$(INSTALL_IHEX)) $(INSTALL_IHEX)
+
+program_bl: $(BSL_TARGETS) $(TELOS_PROGRAM_DEPS) FORCE
+	@echo "    installing $(PLATFORM) bootloader using bsl"
+	$(MSP_BSL) $(MSP_BSL_FLAGS) -r -e -i ihex -P $(BOOTLOADER_IMG)
+
+program_input: ihex
+	@:

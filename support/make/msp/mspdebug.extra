@@ -5,9 +5,7 @@ PROGRAM = mspdebug # Not sure if this is needed
 # MSP_DEBUG_FLAGS can be used to specify the type of device mspdebug is connected to
 MSP_DEBUG_FLAGS ?= rf2500
 
-ifndef MSP_DEBUG
-MSP_DEBUG = mspdebug
-endif
+MSP_DEBUG ?= mspdebug
 
 program: FORCE
 	@echo "    installing $(PLATFORM) binary using mspdebug"
