@@ -293,7 +293,8 @@ implementation {
       else
       {
         lastBuffer = buffer;
-        lastCount = pos - buffer;
+        /*lastCount = pos - buffer;*/
+        lastCount = length;
       }
     }
     post bufferDone();
