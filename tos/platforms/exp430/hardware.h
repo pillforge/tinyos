@@ -50,12 +50,6 @@ enum {
 #define ADC12_PIN_AUTO_CONFIGURE 1
 #define ADC12_PINS_AVAILABLE 8
 
-/* @TODO@ Disable probe for XT1 support until the anomaly observed in
- * apps/bootstrap/LocalTime is resolved. */
-#ifndef PLATFORM_MSP430_HAS_XT1
-#define PLATFORM_MSP430_HAS_XT1 1
-#endif /* PLATFORM_MSP430_HAS_XT1 */
-
 // LEDs
 TOSH_ASSIGN_PIN(RED_LED, 1, 0);
 TOSH_ASSIGN_PIN(GREEN_LED, 8, 1);

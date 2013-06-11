@@ -34,11 +34,11 @@
 
 /**
  *
- * Initilization of the Clock system for the MM5 series motes.
+ * Initilization of the Clock system for the EXP430 Experimenter board.
  *
- * MM5s are based on msp430f5438 series cpus.
+ * The EXP430 based on msp430f5529 series cpus.
  *
- * The 5438 runs at 2.2V and can clock up to 18MHz.   The 5438a
+ * The 5529 runs at 2.2V and can clock up to 18MHz.   The 5438a
  * can run at 1.8V (up to 8 MHz), and its core can be tweaked to
  * enable faster clocking.   We default to using 8MHz so allow
  * low power execution on the 5438a.
