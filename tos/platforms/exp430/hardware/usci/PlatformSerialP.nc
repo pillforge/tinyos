@@ -45,16 +45,19 @@
  */
 msp430_usci_config_t msp430_usci_uart_exp430_config = {
   /* N81 UART mode driven by SMCLK */
-  ctlw0 : (0 << 8) | UCSSEL__SMCLK,
+  ctl0 : 0,
+  ctl1 : UCSSEL__SMCLK,
 
   /* SLAU208 Table 34-4 8MHz 9600: UBR=833, BRS=2, BRF=0 */
-  brw : 833, // 9600
-  mctl : UCBRF_0 + UCBRS_2
+  /*brw : 833, // 9600*/
+  br0 : 65,
+  br1 : 3,
+  mctl : UCBRF_0 | UCBRS_2
 };
 
 module PlatformSerialP {
   provides interface StdControl;
-  provides interface Msp430UsciConfigure[ uint8_t client ];
+  provides interface Msp430UsciConfigure;
   uses interface Resource;
 }
 
@@ -70,7 +73,7 @@ implementation {
 
   event void Resource.granted() { }
 
-  async command const msp430_usci_config_t* Msp430UsciConfigure.getConfiguration[uint8_t client] (){
+  async command const msp430_usci_config_t* Msp430UsciConfigure.getConfiguration(){
     return &msp430_usci_uart_exp430_config;
   }
 }
