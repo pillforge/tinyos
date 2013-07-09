@@ -1,6 +1,5 @@
-
-/* $Id$
- * "Copyright (c) 2005 The Regents of the University  of California.  
+/*									tab:4
+ * "Copyright (c) 2000-2006 The Regents of the University  of California.  
  * All rights reserved.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -19,41 +18,18 @@
  * ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
  * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS."
  *
- * Copyright (c) 2002-2005 Intel Corporation
- * All rights reserved.
- *
- * This file is distributed under the terms in the attached INTEL-LICENSE     
- * file. If you do not find these files, copies can be found by writing to
- * Intel Research Berkeley, 2150 Shattuck Avenue, Suite 1300, Berkeley, CA, 
- * 94704.  Attention:  Intel License Inquiry.
  */
 
 /**
- * Defining the platform-independently named packet structures to be the
- * chip-specific CC1000 packet structures.
- *
- * @author Philip Levis
- * @version $Revision$ $Date$
+ * @author David Moss
  */
 
-
-#ifndef PLATFORM_MESSAGE_H
-#define PLATFORM_MESSAGE_H
-
-#include <Blaze.h>
-#include <Serial.h>
-
-typedef union message_header {
-  blaze_header_t blaze;
-  serial_header_t serial;
-} message_header_t;
-
-typedef union TOSRadioFooter {
-  blaze_footer_t blaze;
-} message_footer_t;
-
-typedef union TOSRadioMetadata {
-  blaze_metadata_t blaze;
-} message_metadata_t;
-
-#endif
+interface AckDetails {
+  
+  /** 
+   * @return TRUE if this packet should be acked, i.e. if the request ack
+   *     bit is set and the destination is not the broadcast address
+   */
+  async command bool shouldAck(message_t *msg);
+  
+}
