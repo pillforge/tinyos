@@ -98,9 +98,10 @@ implementation
   RadioAlarm = DriverLayerP.RadioAlarm;
 
   DriverLayerP.SpiResource -> HplC.SpiResource;
-  DriverLayerP.FastSpiByte -> HplC;
+  DriverLayerP.SpiByte -> HplC;
+  DriverLayerP.SpiBlock -> HplC;
 
-  DriverLayerP.GDO0Capture -> HplC;
+  DriverLayerP.Gdo0Capture -> HplC;
 
   DriverLayerP.Tasklet -> TaskletC;
   DriverLayerP.BusyWait -> BusyWaitMicroC;

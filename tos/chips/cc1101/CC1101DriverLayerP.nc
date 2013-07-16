@@ -54,10 +54,11 @@ module CC1101DriverLayerP
     interface CC1101DriverConfig as Config;
 
     interface SpiByte;
+    interface SpiBlock;
     interface GeneralIO as CSN;
     interface GeneralIO as GDO0;
     interface GeneralIO as GDO2;
-    interface GpioCapture as GDO0Capture;
+    interface GpioCapture as Gdo0Capture;
 
     interface PacketFlag as TransmitPowerFlag;
     interface PacketFlag as RSSIFlag;
@@ -104,7 +105,6 @@ implementation
   {
     STATE_POR = 0,
     STATE_PD = 1,
-    STATE_PD_2_IDLE = 2,
     STATE_IDLE = 3,
     STATE_IDLE_2_RX_ON = 4,
     STATE_RX_ON = 5,
@@ -143,9 +143,9 @@ implementation
 
 #endif
 
-  // flag: RX SFD was captured, but not yet processed
-  norace bool rxSfd = 0;
-  // flag: end of TX event (falling SFD edge) was captured, but not yet processed
+  // flag: RX GDO0 was captured, but not yet processed
+  norace bool rxGdo0 = 0;
+  // flag: end of TX event (falling GDO0 edge) was captured, but not yet processed
   norace bool txEnd = 0;
 
   tasklet_norace uint8_t txPower;
@@ -157,25 +157,100 @@ implementation
 #endif
   message_t rxMsgBuffer;
 
-  norace uint16_t capturedTime; // time when the last SFD rising edge was captured
+
+  // initial CC1101 configuration
+
+  uint8_t configRegs[] = {
+    CC1101_CONFIG_IOCFG2,
+    CC1101_CONFIG_IOCFG1,
+    CC1101_CONFIG_IOCFG0,
+    CC1101_CONFIG_FIFOTHR,
+    CC1101_CONFIG_SYNC1,
+    CC1101_CONFIG_SYNC0,
+    CC1101_CONFIG_PKTLEN,
+    CC1101_CONFIG_PKTCTRL1,
+    CC1101_CONFIG_PKTCTRL0,
+    CC1101_CONFIG_ADDR,
+    CC1101_CONFIG_CHANNR,
+    CC1101_CONFIG_FSCTRL1,
+    CC1101_CONFIG_FSCTRL0,
+    CC1101_CONFIG_FREQ2,
+    CC1101_CONFIG_FREQ1,
+    CC1101_CONFIG_FREQ0,
+    CC1101_CONFIG_MDMCFG4,
+    CC1101_CONFIG_MDMCFG3,
+    CC1101_CONFIG_MDMCFG2,
+    CC1101_CONFIG_MDMCFG1,
+    CC1101_CONFIG_MDMCFG0,
+    CC1101_CONFIG_DEVIATN,
+    CC1101_CONFIG_MCSM2,
+    CC1101_CONFIG_MCSM1,
+    CC1101_CONFIG_MCSM0,
+    CC1101_CONFIG_FOCCFG,
+    CC1101_CONFIG_BSCFG,
+    CC1101_CONFIG_AGCTRL2,
+    CC1101_CONFIG_AGCTRL1,
+    CC1101_CONFIG_AGCTRL0,
+    CC1101_CONFIG_WOREVT1,
+    CC1101_CONFIG_WOREVT0,
+    CC1101_CONFIG_WORCTRL,
+    CC1101_CONFIG_FREND1,
+    CC1101_CONFIG_FREND0,
+    CC1101_CONFIG_FSCAL3,
+    CC1101_CONFIG_FSCAL2,
+    CC1101_CONFIG_FSCAL1,
+    CC1101_CONFIG_FSCAL0,
+    CC1101_CONFIG_RCCTRL1,
+    CC1101_CONFIG_RCCTRL0,
+    CC1101_CONFIG_FSTEST,
+    CC1101_CONFIG_PTEST,
+    CC1101_CONFIG_AGCTST,
+    CC1101_CONFIG_TEST2,
+    CC1101_CONFIG_TEST1,
+    CC1101_CONFIG_TEST0
+  };
+
+  uint8_t configRegSize = 47;
+
+
+  norace uint16_t capturedTime; // time when the last GDO0 rising edge was captured
 
   inline cc1101_status_t getStatus();
-  inline cc1101_status_t enableReceiveSfd();
+  inline cc1101_status_t enableReceiveGdo();
 
   /*----------------- ALARM -----------------*/
   tasklet_async event void RadioAlarm.fired()
   {
-    if( state == STATE_PD_2_IDLE ) {
-      state = STATE_IDLE;
-      if( cmd == CMD_STANDBY )
+    cc1101_status_t status;
+    if( state == STATE_IDLE_2_RX_ON ) {
+      status = getStatus();
+      if( call DiagMsg.record() )
+      {
+        call DiagMsg.uint16(call RadioAlarm.getNow());
+        call DiagMsg.str("alrm");
+        call DiagMsg.str("s=");
+        call DiagMsg.uint8(state);
+        call DiagMsg.str("c=");
+        call DiagMsg.uint8(cmd);
+        if(rxGdo0)
+          call DiagMsg.str("rxGdo0");
+        if(txEnd)
+          call DiagMsg.str("txEnd");
+        if(call GDO0.get())
+          call DiagMsg.str("GDO0");
+        call DiagMsg.str("st=");
+        call DiagMsg.uint8(status.value);
+
+        call DiagMsg.send();
+      }
+      if (status.state == CC1101_STATE_RX){
+        state = STATE_RX_ON;
         cmd = CMD_SIGNAL_DONE;
-    }
-    else if( state == STATE_IDLE_2_RX_ON ) {
-      state = STATE_RX_ON;
-      cmd = CMD_SIGNAL_DONE;
-      // in receive mode, enable SFD capture
-      RADIO_ASSERT(call SFD.get() == 0);
-      enableReceiveSfd();
+        // in receive mode, enable GDO0 capture
+        enableReceiveGdo();
+      } else {
+        call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+      }
     }
     else
       RADIO_ASSERT(FALSE);
@@ -196,10 +271,8 @@ implementation
     call CSN.set();
     call CSN.clr();
 
-    call FastSpiByte.splitWrite(CC1101_CMD_REGISTER_READ | reg);
-    call FastSpiByte.splitReadWrite(0);
-    value = ((uint16_t)call FastSpiByte.splitReadWrite(0) << 8);
-    value += call FastSpiByte.splitRead();
+    call SpiByte.write(CC1101_CMD_REGISTER_WRITE | reg);
+    value = call SpiByte.write(0);
     call CSN.set();
 
     return value;
@@ -223,7 +296,17 @@ implementation
   }
 
   inline cc1101_status_t getStatus() {
-    return strobe(CC1101_SNOP);
+    int8_t value1 = 0, value2 = 0;
+    cc1101_status_t status;
+
+    value1 = strobe(CC1101_SNOP).value;
+    do {
+      value2 = value1;
+      value1 = strobe(CC1101_SNOP).value;
+    }while(value1 != value2);
+
+    status.value = value1;
+    return status;
   }
 
   inline cc1101_status_t writeRegister(uint8_t reg, uint8_t value)
@@ -237,46 +320,42 @@ implementation
     call CSN.clr();
 
     call SpiByte.write(CC1101_CMD_REGISTER_WRITE | reg);
-    status.value = call SpiByte.readWrite(value);
+    status.value = call SpiByte.write(value);
 
     call CSN.set();
+    return status;
+  }
+
+  inline cc1101_status_t burstWrite(uint8_t addr,uint8_t* data, uint8_t length)
+  {
+    cc1101_status_t status;
+    RADIO_ASSERT( call SpiResource.isOwner() );
+
+    status.value = call SpiByte.write(CC1101_CMD_REGISTER_WRITE | CC1101_CMD_BURST_MODE  | addr);
+    call SpiBlock.transfer(data, NULL, length);
+
+    return status;
+  }
+  inline cc1101_status_t burstRead(uint8_t addr,uint8_t* data, uint8_t length)
+  {
+    cc1101_status_t status;
+    RADIO_ASSERT( call SpiResource.isOwner() );
+
+    status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE  | addr);
+    call SpiBlock.transfer(NULL, data, length);
+
     return status;
   }
 
   inline cc1101_status_t writeTxFifo(uint8_t* data, uint8_t length)
   {
-    cc1101_status_t status;
-    uint8_t idx;
-
-    RADIO_ASSERT( call SpiResource.isOwner() );
-
-    call CSN.set();
-    call CSN.clr();
-
-    call FastSpiByte.splitWrite(CC1101_CMD_REGISTER_WRITE | CC1101_TXFIFO);
-    for(idx = 0; idx<length; idx++)
-      call FastSpiByte.splitReadWrite(data[idx]);
-    status.value = call FastSpiByte.splitRead();
-
-    call CSN.set();
-    return status;
+    return burstWrite(CC1101_TXFIFO, data, length);
+  }
+  inline cc1101_status_t readRxFifo(uint8_t* data, uint8_t length)
+  {
+    return burstRead(CC1101_RXFIFO, data, length);
   }
 
-  inline uint8_t waitForRxFifo() {
-
-    if(call FIFO.get() == 1) {
-      // return quickly if FIFO pin is already high
-      return 1;
-    } else {
-
-      // wait for fifo to go high or timeout
-      // timeout is now + 2 byte time (4 symbol time)
-      uint16_t timeout = call RadioAlarm.getNow() + 4 * CC1101_SYMBOL_TIME;
-
-      while(call FIFO.get() == 0 && (timeout - call RadioAlarm.getNow() < 0x7fff));
-      return call FIFO.get();
-    }
-  }
 
   inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr)
   {
@@ -289,44 +368,22 @@ implementation
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
-    // wait for fifo to go high
-    waitForRxFifo();
-    RADIO_ASSERT(call FIFO.get() == 1);
 
-    // issue SPI command
-    call FastSpiByte.splitWrite(CC1101_CMD_REGISTER_READ | CC1101_RXFIFO);
-    status.value = call FastSpiByte.splitRead();
-    call FastSpiByte.splitWrite(0);
+    status.value = call SpiByte.write(CC1101_CMD_REGISTER_WRITE | CC1101_RXBYTES);
+    *lengthPtr = call SpiByte.write(0);
 
-    RADIO_ASSERT(status.lock == 1);
-    RADIO_ASSERT(status.tx_active == 0);
-    RADIO_ASSERT(status.tx_underflow == 0);
-    RADIO_ASSERT(status.xosc16m_stable == 1);
-    RADIO_ASSERT(status.lock == 1);
-    RADIO_ASSERT(status.rssi_valid == 1);
-
-    *lengthPtr = call FastSpiByte.splitRead();
-
-    // start reading the next byte
-    // important! fifo pin must be checked after the previous SPI read completed
-    waitForRxFifo();
-    call FastSpiByte.splitWrite(0);
+    RADIO_ASSERT(status.chip_rdyn == 0);
+    RADIO_ASSERT(status.state == CC1101_STATE_RX);
 
     return status;
   }
 
   inline void readPayloadFromRxFifo(uint8_t* data, uint8_t length)
   {
-    uint8_t idx;
-
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
 
-    for(idx = 0; idx<length; idx++) {
-      data[idx] = call FastSpiByte.splitRead();
-      waitForRxFifo();
-      call FastSpiByte.splitWrite(0);
-    }
+    readRxFifo(data, length);
   }
 
   inline void readRssiFromRxFifo(uint8_t* rssiPtr)
@@ -334,9 +391,7 @@ implementation
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
 
-    *rssiPtr = call FastSpiByte.splitRead();
-    waitForRxFifo();
-    call FastSpiByte.splitWrite(0);
+    *rssiPtr = call SpiByte.write(0);
   }
 
   inline void readCrcOkAndLqiFromRxFifo(uint8_t* crcOkAndLqiPtr)
@@ -344,7 +399,7 @@ implementation
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
 
-    *crcOkAndLqiPtr = call FastSpiByte.splitRead();
+    *crcOkAndLqiPtr = call SpiByte.write(0);
 
     // end RxFifo read operation
     call CSN.set();
@@ -352,19 +407,7 @@ implementation
 
   inline cc1101_status_t flushRxFifo() {
 
-    // make sure that at least one byte has been read
-    // from the rx fifo before issuing the flush strobe (datasheet p. 60)
-    call CSN.set(); // set CSN, just in clase it's not set
-    call CSN.clr(); // clear CSN, starting a multi-byte SPI command
-    call FastSpiByte.splitWrite(CC1101_CMD_REGISTER_READ | CC1101_RXFIFO);
-    call FastSpiByte.splitRead();
-    call FastSpiByte.splitWrite(0);
-    call FastSpiByte.splitRead(); // read a dummy byte from the rx fifo
-    call CSN.set();
-
-    // issue the strobe twice (datasheet p. 32)
-    strobe(CC1101_SFLUSHRX);
-    return strobe(CC1101_SFLUSHRX);
+    return strobe(CC1101_SFRX);
   }
 
   /*----------------- INIT -----------------*/
@@ -376,14 +419,14 @@ implementation
     uint8_t i;
 #endif
 
-    uint16_t timeout;
+    /*uint16_t timeout;*/
 
     // set pin directions
     call CSN.makeOutput();
     call GDO0.makeInput();
     call GDO2.makeInput(); // CHIP_RDYn by default
 
-    call GDO0Capture.disable();
+    call Gdo0Capture.disable();
 
     rxMsg = &rxMsgBuffer;
 
@@ -408,6 +451,8 @@ implementation
   }
 
   inline void resetRadio() {
+    uint16_t timeout;
+
     // Go through reset procedure
     call CSN.set();
     call BusyWait.wait(30);
@@ -445,8 +490,8 @@ implementation
   {
     resetRadio();
 
-    txPower = CC1101_DEF_RFPOWER & CC1101_TX_PWR_MASK;
-    channel = CC1101_DEF_CHANNEL & CC1101_CHANNEL_MASK;
+    /*txPower = CC1101_DEF_RFPOWER & CC1101_TX_PWR_MASK;*/
+    /*channel = CC1101_DEF_CHANNEL & CC1101_CHANNEL_MASK;*/
 
   }
 
@@ -493,28 +538,33 @@ implementation
 
   tasklet_async command error_t RadioState.setChannel(uint8_t c)
   {
-    c &= CC1101_CHANNEL_MASK;
-
-    if( cmd != CMD_NONE )
-      return EBUSY;
-    else if( channel == c )
-      return EALREADY;
-
-    channel = c;
-    cmd = CMD_CHANNEL;
-    call Tasklet.schedule();
-
-    return SUCCESS;
+/*
+ *    c &= CC1101_CHANNEL_MASK;
+ *
+ *    if( cmd != CMD_NONE )
+ *      return EBUSY;
+ *    else if( channel == c )
+ *      return EALREADY;
+ *
+ *    channel = c;
+ *    cmd = CMD_CHANNEL;
+ *    call Tasklet.schedule();
+ *
+ *    return SUCCESS;
+ */
   }
 
+  //TODO: Support setting channels
   inline void setChannel()
   {
-    cc1101_fsctrl_t fsctrl;
-    // set up freq
-    fsctrl= cc1101_fsctrl_default;
-    fsctrl.f.freq = 357+5*(channel - 11);
-
-    writeRegister(CC1101_FSCTRL, fsctrl.value);
+/*
+ *    cc1101_fsctrl_t fsctrl;
+ *    // set up freq
+ *    fsctrl= cc1101_fsctrl_default;
+ *    fsctrl.f.freq = 357+5*(channel - 11);
+ *
+ *    writeRegister(CC1101_FSCTRL, fsctrl.value);
+ */
   }
 
   inline void changeChannel()
@@ -537,48 +587,61 @@ implementation
 
   /*----------------- TURN ON/OFF -----------------*/
 
-  void sendConfigRegs(){
-  
-  }
   inline void changeState()
   {
+
+    if( call DiagMsg.record() )
+    {
+      call DiagMsg.uint16(call RadioAlarm.getNow());
+      call DiagMsg.str("cs");
+      call DiagMsg.str("s=");
+      call DiagMsg.uint8(state);
+      call DiagMsg.str("c=");
+      call DiagMsg.uint8(cmd);
+      call DiagMsg.str("l=");
+      call DiagMsg.send();
+    }
 
     if( (cmd == CMD_STANDBY || cmd == CMD_TURNON)
         && state == STATE_PD  && isSpiAcquired() && call RadioAlarm.isFree() )
     {
+      call CSN.clr();
+      while(call GDO2.get());
       // Go back to IDLE state
       strobe(CC1101_SIDLE);
       // Send configuration registers
-      sendConfigRegs();
+      call CSN.clr();
+      burstWrite(0x0, configRegs, configRegSize);
+      call CSN.set();
 
-      call RadioAlarm.wait(PD_2_IDLE_TIME); // .86ms OSC startup time
-      state = STATE_PD_2_IDLE;
+      state = STATE_IDLE;
+      call Tasklet.schedule();
     }
     else if( cmd == CMD_TURNON && state == STATE_IDLE && isSpiAcquired() && call RadioAlarm.isFree())
     {
       // setChannel was ignored in SLEEP because the SPI was not working, so do it here
-      setChannel();
+      /*setChannel();*/
 
       // start receiving
-      strobe(CC1101_SRXON);
+      strobe(CC1101_SRX);
       call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
       state = STATE_IDLE_2_RX_ON;
     }
     else if( (cmd == CMD_TURNOFF || cmd == CMD_STANDBY)
         && state == STATE_RX_ON && isSpiAcquired() )
     {
-      // disable SFD capture
-      call SfdCapture.disable();
+      // disable GDO0 capture
+      call Gdo0Capture.disable();
 
       // stop receiving
-      strobe(CC1101_SRFOFF);
+      strobe(CC1101_SIDLE);
       state = STATE_IDLE;
     }
 
     if( cmd == CMD_TURNOFF && state == STATE_IDLE  && isSpiAcquired() )
     {
       // stop oscillator
-      strobe(CC1101_SXOSCOFF);
+      strobe(CC1101_SPWD);
 
       // do a reset
       initRadio();
@@ -633,7 +696,6 @@ implementation
     return SUCCESS;
   }
 
-  // TODO: turn on SFD capture when turning off radio
   tasklet_async command error_t RadioState.turnOn()
   {
     if( cmd != CMD_NONE || (state == STATE_PD && ! call RadioAlarm.isFree()) )
@@ -662,6 +724,7 @@ implementation
 
   tasklet_async command error_t RadioSend.send(message_t* msg)
   {
+#if 0
     uint16_t time;
     uint8_t p;
     uint8_t length;
@@ -675,7 +738,7 @@ implementation
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
-    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxSfd || txEnd )
+    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
       return EBUSY;
 
     p = (call PacketTransmitPower.isSet(msg) ?
@@ -706,24 +769,27 @@ implementation
     length -= header;
 
     // first upload the header to gain some time
+    call CSN.set();
+    call CSN.clr();
     writeTxFifo(data, header);
+    call CSN.set();
 
     atomic {
-      // there's a chance that there was a receive SFD interrupt in such a short time
+      // there's a chance that there was a receive GDO0 interrupt in such a short time
       // clean up the TXFIFO and bail out
-      if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || rxSfd || call SFD.get() == 1 ) {
+      if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || rxGdo0 || call GDO0.get() == 1 ) {
         // discard header we wrote to TXFIFO
         strobe(CC1101_SFLUSHTX);
         // and bail out
         return EBUSY;
       }
 #ifdef RADIO_DEBUG
-      sfd1 = call SFD.get();
+      sfd1 = call GDO0.get();
 #endif
       // start transmission
       status = strobe(CC1101_STXON);
 #ifdef RADIO_DEBUG
-      sfd2 = call SFD.get();
+      sfd2 = call GDO0.get();
 #endif
       // get a timestamp right after strobe returns
       time = call RadioAlarm.getNow();
@@ -731,11 +797,11 @@ implementation
       cmd = CMD_TRANSMIT;
       state = STATE_TX_ON;
 #ifdef RADIO_DEBUG
-      sfd3 = call SFD.get();
+      sfd3 = call GDO0.get();
 #endif
-      call SfdCapture.captureFallingEdge();
+      call Gdo0Capture.captureFallingEdge();
 #ifdef RADIO_DEBUG
-      sfd4 = call SFD.get();
+      sfd4 = call GDO0.get();
 #endif
     }
 
@@ -748,13 +814,20 @@ implementation
 
     if( timesync == 0 ) {
       // no timesync: write the entire payload to the fifo
-      if(length>0)
+      if(length>0){
+        call CSN.set();
+        call CSN.clr();
         writeTxFifo(data+header, length - 1);
-      state = STATE_BUSY_TX_2_RX_ON;
+        state = STATE_BUSY_TX_2_RX_ON;
+        call CSN.set();
+      }
     } else {
       // timesync required: write the payload before the timesync bytes to the fifo
       // TODO: we're assuming here that the timestamp is at the end of the message
+      call CSN.set();
+      call CSN.clr();
       writeTxFifo(data+header, length - sizeof(timesync_relative) - 1);
+      call CSN.set();
     }
 
 
@@ -767,11 +840,11 @@ implementation
       time32 = call LocalTime.get();
     }
 
-    // adjust time32 with the time elapsed since the SFD event
+    // adjust time32 with the time elapsed since the GDO0 event
     time -= sfdTime;
     time32 -= time;
 
-    // adjust for delay between the STXON strobe and the transmission of the SFD
+    // adjust for delay between the STXON strobe and the transmission of the GDO0
     time32 += TX_SFD_DELAY;
 
     call PacketTimeStamp.set(msg, time32);
@@ -782,7 +855,10 @@ implementation
 
       // write it to the fifo
       // TODO: we're assuming here that the timestamp is at the end of the message
+      call CSN.set();
+      call CSN.clr();
       writeTxFifo((uint8_t*)(&timesync_relative), sizeof(timesync_relative));
+      call CSN.set();
       state = STATE_BUSY_TX_2_RX_ON;
     }
 
@@ -801,7 +877,8 @@ implementation
       call DiagMsg.send();
     }
 #endif
-    // SFD capture interrupt will be triggered: we'll reenable interrupts from there
+#endif
+    // GDO0 capture interrupt will be triggered: we'll reenable interrupts from there
     // and clear the rx fifo -- should something have arrived in the meantime
     return SUCCESS;
   }
@@ -816,13 +893,13 @@ implementation
     if( cmd != CMD_NONE || state != STATE_RX_ON )
       return EBUSY;
 
-    if(call CCA.get()) {
-      signal RadioCCA.done(SUCCESS);
-    } else {
-      // TODO: remove this
-      RADIO_ASSERT(FAIL);
-      signal RadioCCA.done(EBUSY);
-    }
+    /*if(call CCA.get()) {*/
+    /*  signal RadioCCA.done(SUCCESS);*/
+    /*} else {*/
+    /*  // TODO: remove this*/
+    /*  RADIO_ASSERT(FAIL);*/
+    /*  signal RadioCCA.done(EBUSY);*/
+    /*}*/
     return SUCCESS;
   }
 
@@ -830,41 +907,31 @@ implementation
 
   /*----------------- RECEIVE -----------------*/
 
-  inline cc1101_status_t enableReceiveSfd() {
+  inline cc1101_status_t enableReceiveGdo()
+  {
     cc1101_status_t status;
-#ifdef RADIO_DEBUG
-    uint8_t sfd1, sfd2, sfd3, fifo, fifop;
-#endif
+/*#ifdef RADIO_DEBUG*/
+/*    uint8_t gdo0_1, gdo0_2, gdo0_3;*/
+/*#endif*/
     atomic {
-      // turn off the radio first
-      strobe(CC2420_SRFOFF);
-#ifdef RADIO_DEBUG
-      sfd1 = call SFD.get();
-#endif
+/*#ifdef RADIO_DEBUG*/
+/*      gdo0_1 = call GDO0.get();*/
+/*#endif*/
       // flush rx fifo
       flushRxFifo();
-#ifdef RADIO_DEBUG
-      sfd2 = call SFD.get();
-#endif
-      // ready to receive new message: enable receive SFD capture
-      call SfdCapture.captureRisingEdge();
-#ifdef RADIO_DEBUG
-      sfd3 = call SFD.get();
-      fifo = call FIFO.get();
-      fifop = call FIFOP.get();
-#endif
-      // turn the radio back on
-      status = strobe(CC2420_SRXON);
+/*#ifdef RADIO_DEBUG*/
+/*      gdo0_2 = call GDO0.get();*/
+/*#endif*/
+      // ready to receive new message: enable receive GDO0 capture
+      call Gdo0Capture.captureRisingEdge();
+/*#ifdef RADIO_DEBUG*/
+/*      gdo0_3 = call GDO0.get();*/
+/*#endif*/
     }
-    RADIO_ASSERT(sfd1 == 0);
-    RADIO_ASSERT(sfd2 == 0);
-    RADIO_ASSERT(sfd3 == 0);
-    RADIO_ASSERT(fifo == 0);
-    RADIO_ASSERT(fifop == 0);
-    //RADIO_ASSERT(status.lock == 1);
-    RADIO_ASSERT(status.tx_active == 0);
-    //RADIO_ASSERT(status.tx_underflow == 0);
-    RADIO_ASSERT(status.xosc16m_stable == 1);
+    // TODO: Add appropriate debugging asserts
+    /*RADIO_ASSERT(gdo0_1 == 0);*/
+    /*RADIO_ASSERT(gdo0_2 == 0);*/
+    /*RADIO_ASSERT(gdo0_3 == 0);*/
     return status;
   }
 
@@ -926,11 +993,23 @@ implementation
     // read the length byte
     readLengthFromRxFifo(&length);
 
+    if( call DiagMsg.record() )
+    {
+      call DiagMsg.uint16(call RadioAlarm.getNow());
+      call DiagMsg.str("dwnld");
+      call DiagMsg.str("s=");
+      call DiagMsg.uint8(state);
+      call DiagMsg.str("c=");
+      call DiagMsg.uint8(cmd);
+      call DiagMsg.str("l=");
+      call DiagMsg.uint8(length);
+      call DiagMsg.send();
+    }
     if (length < 3 || length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
       state = STATE_RX_ON;
       cmd = CMD_NONE;
-      enableReceiveSfd();
+      enableReceiveGdo();
       return;
     }
 
@@ -951,14 +1030,14 @@ implementation
 
     /* UNCOMMENT THIS CODE IF THERE ARE TIMESTAMPING ERRORS
     // there are still bytes in the fifo or if there's an overflow, flush rx fifo
-    if (call FIFOP.get() == 1 || call FIFO.get() == 1 || call SFD.get() == 1) {
+    if (call FIFOP.get() == 1 || call FIFO.get() == 1 || call GDO0.get() == 1) {
     RADIO_ASSERT(FALSE);
 
     state = STATE_RX_ON;
     cmd = CMD_NONE;
 
-    RADIO_ASSERT(call SFD.get() == 0);
-    enableReceiveSfd();
+    RADIO_ASSERT(call GDO0.get() == 0);
+    enableReceiveGdo();
     return;
     }
      */
@@ -966,8 +1045,8 @@ implementation
     state = STATE_RX_ON;
     cmd = CMD_NONE;
 
-    // ready to receive new message: enable SFD interrupts
-    enableReceiveSfd();
+    // ready to receive new message: enable GDO0 interrupts
+    enableReceiveGdo();
 
     // bail out if we're not interested in this message
     if( !signal RadioReceive.header(rxMsg) )
@@ -1041,18 +1120,20 @@ implementation
 
   /*----------------- IRQ -----------------*/
 
-  // RX SFD (rising edge) or end of TX (falling edge)
-  async event void SfdCapture.captured( uint16_t time )
+  // RX GDO0 (rising edge) or end of TX (falling edge)
+  //TODO
+  async event void Gdo0Capture.captured( uint16_t time )
   {
 
 
-    RADIO_ASSERT( ! rxSfd ); // assert that there's no nesting
+
+    RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
 
-    call SfdCapture.disable();
+    call Gdo0Capture.disable();
 
     if(state == STATE_RX_ON) {
-      rxSfd = TRUE;
+      rxGdo0 = TRUE;
       capturedTime = time;
     } else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
       txEnd = TRUE;
@@ -1064,31 +1145,22 @@ implementation
 #ifdef RADIO_DEBUG_IRQ
     if( call DiagMsg.record() )
     {
-      if(rxSfd)
-        call DiagMsg.str("rxSfd");
+      if(rxGdo0)
+        call DiagMsg.str("rxGdo0");
       if(txEnd)
         call DiagMsg.str("txEnd");
       call DiagMsg.uint16(call RadioAlarm.getNow());
       call DiagMsg.str("s=");
       call DiagMsg.uint8(state);
-      if(call FIFO.get())
-        call DiagMsg.str("FIFO");
-      if(call FIFOP.get())
-        call DiagMsg.str("FIFOP");
-      if(call SFD.get())
-        call DiagMsg.str("SFD");
+      if(call GDO0.get())
+        call DiagMsg.str("GDO0");
       call DiagMsg.send();
     }
 #endif
 
+    call Leds.led2Toggle();
     // do the rest of the processing
     call Tasklet.schedule();
-  }
-
-  // FIFOP interrupt, last byte received
-  async event void FifopInterrupt.fired()
-  {
-    // not used
   }
 
 
@@ -1120,16 +1192,12 @@ implementation
       call DiagMsg.uint8(state);
       call DiagMsg.str("c=");
       call DiagMsg.uint8(cmd);
-      if(rxSfd)
-        call DiagMsg.str("rxSfd");
+      if(rxGdo0)
+        call DiagMsg.str("rxGdo0");
       if(txEnd)
         call DiagMsg.str("txEnd");
-      if(call FIFO.get())
-        call DiagMsg.str("FIFO");
-      if(call FIFOP.get())
-        call DiagMsg.str("FIFOP");
-      if(call SFD.get())
-        call DiagMsg.str("SFD");
+      if(call GDO0.get())
+        call DiagMsg.str("GDO0");
 
       call DiagMsg.send();
     }
@@ -1150,7 +1218,7 @@ implementation
         cmd = CMD_NONE;
 
         // a packet might have been received since the end of the transmission
-        status = enableReceiveSfd();
+        status = enableReceiveGdo();
 
 #if defined(RADIO_DEBUG_IRQ) && defined(RADIO_DEBUG_MESSAGES)
         if( call DiagMsg.record() )
@@ -1159,22 +1227,18 @@ implementation
           call DiagMsg.uint16(call RadioAlarm.getNow());
           // TODO: captured time is not set for tx end
           //call DiagMsg.uint16(capturedTime - (uint16_t)call PacketTimeStamp.timestamp(txMsg));
-          if(call FIFO.get())
-            call DiagMsg.str("FIFO");
-          if(call FIFOP.get())
-            call DiagMsg.str("FIFOP");
-          if(call SFD.get())
-            call DiagMsg.str("SFD");
+          if(call GDO0.get())
+            call DiagMsg.str("GDO0");
 
           call DiagMsg.send();
         }
 #endif
 
         // check for tx underflow
-        if ( status.tx_underflow == 1) {
+        if ( status.state == CC1101_STATE_TXFIFO_UNDERFLOW ) {
           RADIO_ASSERT(FALSE);
           // flush tx fifo
-          strobe(CC1101_SFLUSHTX);
+          strobe(CC1101_SFTX);
           signal RadioSend.sendDone(FAIL);
         } else {
           signal RadioSend.sendDone(SUCCESS);
@@ -1184,11 +1248,11 @@ implementation
         RADIO_ASSERT(FALSE);
     }
 
-    if( rxSfd ) {
+    if( rxGdo0 ) {
       // incoming packet
       if( isSpiAcquired() )
       {
-        rxSfd = FALSE;
+        rxGdo0 = FALSE;
 
         RADIO_ASSERT(state == STATE_RX_ON);
         RADIO_ASSERT(cmd == CMD_NONE);
@@ -1218,7 +1282,7 @@ implementation
       }
     }
 
-    if( cmd == CMD_NONE && state == STATE_RX_ON && ! rxSfd && ! txEnd )
+    if( cmd == CMD_NONE && state == STATE_RX_ON && ! rxGdo0 && ! txEnd )
       signal RadioSend.ready();
 
     if( cmd == CMD_NONE )
@@ -1233,16 +1297,12 @@ implementation
       call DiagMsg.uint8(state);
       call DiagMsg.str("c=");
       call DiagMsg.uint8(cmd);
-      if(rxSfd)
-        call DiagMsg.str("rxSfd");
+      if(rxGdo0)
+        call DiagMsg.str("rxGdo0");
       if(txEnd)
         call DiagMsg.str("txEnd");
-      if(call FIFO.get())
-        call DiagMsg.str("FIFO");
-      if(call FIFOP.get())
-        call DiagMsg.str("FIFOP");
-      if(call SFD.get())
-        call DiagMsg.str("SFD");
+      if(call GDO0.get())
+        call DiagMsg.str("GDO0");
 
       call DiagMsg.send();
     }

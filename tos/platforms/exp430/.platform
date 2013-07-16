@@ -22,40 +22,49 @@ for (split(/\n/, <<'EOText'
 
   %T/chips/msp430/pmm
   %T/chips/msp430/adc12
+  %T/chips/msp430/sensors
+
+  # Rfxlink based CC1101 Radio stack
+  %P/chips/ccxx00
+  %T/chips/cc1101
+  %T/lib/rfxlink/layers
+  %T/lib/rfxlink/util
 
   # Rincon CCxx00 Dual Radio Stack
-  %P/chips/ccxx00
+  #%P/chips/ccxx00
 
-  %T/lib/crcx
+  #%T/lib/crcx
 
-  %T/chips/ccxx00_single/
-  %T/chips/ccxx00_single/acks
-  %T/chips/ccxx00_single/acks/StaticAcks
-  %T/chips/ccxx00_single/alarm
-  %T/chips/ccxx00_single/am
-  %T/chips/ccxx00_single/crc
-  %T/chips/ccxx00_single/csma
-  %T/chips/ccxx00_single/csma/continuoussense
-  %T/chips/ccxx00_single/init
-  %T/chips/ccxx00_single/interfaces
-  %T/chips/ccxx00_single/link
-  %T/chips/ccxx00_single/lpl
-  %T/chips/ccxx00_single/lpl/alwayson
-  %T/chips/ccxx00_single/packet
-  %T/chips/ccxx00_single/powermanager
-  %T/chips/ccxx00_single/radios/cc1100
-  %T/chips/ccxx00_single/receive
-  %T/chips/ccxx00_single/select
-  %T/chips/ccxx00_single/spi
-  %T/chips/ccxx00_single/splitcontrolmanager
-  %T/chips/ccxx00_single/traffic
-  %T/chips/ccxx00_single/transmit
-  %T/chips/ccxx00_single/unique
+  #%T/chips/ccxx00_single/
+  #%T/chips/ccxx00_single/acks
+  #%T/chips/ccxx00_single/acks/StaticAcks
+  #%T/chips/ccxx00_single/alarm
+  #%T/chips/ccxx00_single/am
+  #%T/chips/ccxx00_single/crc
+  #%T/chips/ccxx00_single/csma
+  #%T/chips/ccxx00_single/csma/continuoussense
+  ##%T/chips/ccxx00_single/csma/singlesense
+  #%T/chips/ccxx00_single/init
+  #%T/chips/ccxx00_single/interfaces
+  #%T/chips/ccxx00_single/link
+  #%T/chips/ccxx00_single/lpl
+  #%T/chips/ccxx00_single/lpl/alwayson
+  #%T/chips/ccxx00_single/packet
+  #%T/chips/ccxx00_single/powermanager
+  #%T/chips/ccxx00_single/radios/cc1100
+  #%T/chips/ccxx00_single/receive
+  #%T/chips/ccxx00_single/select
+  #%T/chips/ccxx00_single/spi
+  #%T/chips/ccxx00_single/splitcontrolmanager
+  #%T/chips/ccxx00_single/traffic
+  #%T/chips/ccxx00_single/transmit
+  #%T/chips/ccxx00_single/unique
 
   %T/lib/timer
   %T/lib/serial
   %T/lib/power
   %T/lib/printf
+  %T/lib/diagmsg
 
 EOText
 )) {

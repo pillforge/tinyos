@@ -1,5 +1,6 @@
+
 /*
- * Copyright (c) 2013, Vanderbilt University
+ * Copyright (c) 2007, Vanderbilt University
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,54 +31,30 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Author: Miklos Maroti
- * Author: Addisu Z. Taddese (Port to CC1101)
  */
 
-#include <RadioConfig.h>
+#ifndef __RADIOCONFIG_H__
+#define __RADIOCONFIG_H__
 
-configuration ActiveMessageC
-{
-	provides
-	{
-		interface SplitControl;
+#include <Timer.h>
+/**
+ * This is the timer type of the radio alarm interface
+ */
+typedef T32khz TRadio;
+typedef uint16_t tradio_size;
 
-		interface AMSend[uint8_t id];
-		interface Receive[uint8_t id];
-		interface Receive as Snoop[uint8_t id];
-		interface SendNotifier[am_id_t id];
 
-		interface Packet;
-		interface AMPacket;
+/**
+ * The number of radio alarm ticks per one microsecond (0.9216). 
+ * We use integers and no parentheses just to make deputy happy.
+ * Ok, further hacks were required for deputy, I removed 00 from the
+ * beginning and end to ba able to handle longer wait periods.
+ */
+//TODO: Determine this value
+#define RADIO_ALARM_MICROSEC	4UL
 
-		interface PacketAcknowledgements;
-		interface LowPowerListening;
-		interface PacketLink;
-		interface RadioChannel;
-
-		/*interface PacketTimeStamp<TMicro, uint32_t> as PacketTimeStampMicro;*/
-		interface PacketTimeStamp<TMilli, uint32_t> as PacketTimeStampMilli;
-	}
-}
-
-implementation
-{
-	components CC1101ActiveMessageC as MessageC;
-
-	SplitControl = MessageC;
-
-	AMSend = MessageC;
-	Receive = MessageC.Receive;
-	Snoop = MessageC.Snoop;
-	SendNotifier = MessageC;
-
-	Packet = MessageC;
-	AMPacket = MessageC;
-
-	PacketAcknowledgements = MessageC;
-	LowPowerListening = MessageC;
-	PacketLink = MessageC;
-	RadioChannel = MessageC;
-
-	PacketTimeStampMilli = MessageC;
-	/*PacketTimeStampMicro = MessageC;*/
-}
+/**
+ * The base two logarithm of the number of radio alarm ticks per one millisecond
+ */
+#define RADIO_ALARM_MILLI_EXP	12UL
+#endif
