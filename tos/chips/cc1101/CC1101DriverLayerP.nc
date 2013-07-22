@@ -224,6 +224,7 @@ implementation
     cc1101_status_t status;
     if( state == STATE_IDLE_2_RX_ON ) {
       status = getStatus();
+#ifdef RADIO_DEBUG_STATE
       if( call DiagMsg.record() )
       {
         call DiagMsg.uint16(call RadioAlarm.getNow());
@@ -243,6 +244,7 @@ implementation
 
         call DiagMsg.send();
       }
+#endif
       if (status.state == CC1101_STATE_RX){
         state = STATE_RX_ON;
         cmd = CMD_SIGNAL_DONE;
@@ -251,8 +253,7 @@ implementation
       } else {
         call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
       }
-    }
-    else
+    } else
       RADIO_ASSERT(FALSE);
 
     // make sure the rest of the command processing is called
@@ -360,6 +361,7 @@ implementation
   inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr)
   {
     cc1101_status_t status;
+    uint8_t pkt_status;
 
     RADIO_ASSERT( call SpiResource.isOwner() );
     RADIO_ASSERT( call CSN.get() == 1 );
@@ -368,9 +370,12 @@ implementation
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
+    burstRead(CC1101_PKTSTATUS, &pkt_status, 1);
 
-    status.value = call SpiByte.write(CC1101_CMD_REGISTER_WRITE | CC1101_RXBYTES);
-    *lengthPtr = call SpiByte.write(0);
+    /*status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE | CC1101_RXBYTES);*/
+    /**lengthPtr = call SpiByte.write(0);*/
+
+    status = burstRead(CC1101_RXBYTES, lengthPtr, 1);
 
     RADIO_ASSERT(status.chip_rdyn == 0);
     RADIO_ASSERT(status.state == CC1101_STATE_RX);
@@ -590,6 +595,7 @@ implementation
   inline void changeState()
   {
 
+#ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
     {
       call DiagMsg.uint16(call RadioAlarm.getNow());
@@ -601,6 +607,7 @@ implementation
       call DiagMsg.str("l=");
       call DiagMsg.send();
     }
+#endif
 
     if( (cmd == CMD_STANDBY || cmd == CMD_TURNON)
         && state == STATE_PD  && isSpiAcquired() && call RadioAlarm.isFree() )
@@ -724,7 +731,6 @@ implementation
 
   tasklet_async command error_t RadioSend.send(message_t* msg)
   {
-#if 0
     uint16_t time;
     uint8_t p;
     uint8_t length;
@@ -741,53 +747,31 @@ implementation
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
       return EBUSY;
 
-    p = (call PacketTransmitPower.isSet(msg) ?
-        call PacketTransmitPower.get(msg) : CC1101_DEF_RFPOWER) & CC1101_TX_PWR_MASK;
-
-    if( p != txPower )
-    {
-      cc1101_txctrl_t txctrl = cc1101_txctrl_default;
-
-      txPower = p;
-
-      txctrl.f.pa_level = txPower;
-      writeRegister(CC1101_TXCTRL, txctrl.value);
-    }
-
-    if( call Config.requiresRssiCca(msg) && !call CCA.get() )
-      return EBUSY;
+    /*
+     *if( call Config.requiresRssiCca(msg) && !call CCA.get() )
+     *  return EBUSY;
+     */
 
     data = getPayload(msg);
-    length = getHeader(msg)->length;
+    length = call RadioPacket.payloadLength(msg);
 
-    // length | data[0] ... data[length-3] | automatically generated FCS
-
-    header = call Config.headerPreloadLength();
-    if( header > length )
-      header = length;
-
-    length -= header;
+    // start transmission
+    status = strobe(CC1101_STX);
+    // Wait until TX mode
+    do{
+      status = getStatus();
+    }while(status.state != CC1101_STATE_TX);
 
     // first upload the header to gain some time
     call CSN.set();
     call CSN.clr();
-    writeTxFifo(data, header);
+    writeTxFifo(data, length);
     call CSN.set();
 
     atomic {
-      // there's a chance that there was a receive GDO0 interrupt in such a short time
-      // clean up the TXFIFO and bail out
-      if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || rxGdo0 || call GDO0.get() == 1 ) {
-        // discard header we wrote to TXFIFO
-        strobe(CC1101_SFLUSHTX);
-        // and bail out
-        return EBUSY;
-      }
 #ifdef RADIO_DEBUG
       sfd1 = call GDO0.get();
 #endif
-      // start transmission
-      status = strobe(CC1101_STXON);
 #ifdef RADIO_DEBUG
       sfd2 = call GDO0.get();
 #endif
@@ -799,75 +783,81 @@ implementation
 #ifdef RADIO_DEBUG
       sfd3 = call GDO0.get();
 #endif
-      call Gdo0Capture.captureFallingEdge();
+      /*call Gdo0Capture.captureFallingEdge();*/
+      call Gdo0Capture.disable();
 #ifdef RADIO_DEBUG
       sfd4 = call GDO0.get();
 #endif
     }
 
-    //RADIO_ASSERT(sfd1 == 0);
+#ifdef RADIO_DEBUG
+    RADIO_ASSERT(sfd1 == 0);
     RADIO_ASSERT(sfd2 == 0);
     RADIO_ASSERT(sfd3 == 0);
     RADIO_ASSERT(sfd4 == 0);
+#endif
 
-    timesync = call PacketTimeSyncOffset.isSet(msg) ? ((void*)msg) + call PacketTimeSyncOffset.get(msg) : 0;
+/*
+ *    timesync = call PacketTimeSyncOffset.isSet(msg) ? ((void*)msg) + call PacketTimeSyncOffset.get(msg) : 0;
+ *
+ *    if( timesync == 0 ) {
+ *      // no timesync: write the entire payload to the fifo
+ *      if(length>0){
+ *        call CSN.set();
+ *        call CSN.clr();
+ *        writeTxFifo(data+header, length - 1);
+ *        state = STATE_BUSY_TX_2_RX_ON;
+ *        call CSN.set();
+ *      }
+ *    } else {
+ *      // timesync required: write the payload before the timesync bytes to the fifo
+ *      // TODO: we're assuming here that the timestamp is at the end of the message
+ *      call CSN.set();
+ *      call CSN.clr();
+ *      writeTxFifo(data+header, length - sizeof(timesync_relative) - 1);
+ *      call CSN.set();
+ *    }
+ *
+ *
+ *    // compute timesync
+ *    sfdTime = time;
+ *
+ *    // read both clocks
+ *    atomic {
+ *      time = call RadioAlarm.getNow();
+ *      time32 = call LocalTime.get();
+ *    }
+ *
+ *    // adjust time32 with the time elapsed since the GDO0 event
+ *    time -= sfdTime;
+ *    time32 -= time;
+ *
+ *    // adjust for delay between the STXON strobe and the transmission of the GDO0
+ *    time32 += TX_SFD_DELAY;
+ *
+ *    call PacketTimeStamp.set(msg, time32);
+ *
+ *    if( timesync != 0 ) {
+ *      // read and adjust the timestamp field
+ *      timesync_relative = (*(timesync_absolute_t*)timesync) - time32;
+ *
+ *      // write it to the fifo
+ *      // TODO: we're assuming here that the timestamp is at the end of the message
+ *      call CSN.set();
+ *      call CSN.clr();
+ *      writeTxFifo((uint8_t*)(&timesync_relative), sizeof(timesync_relative));
+ *      call CSN.set();
+ *      state = STATE_BUSY_TX_2_RX_ON;
+ *    }
+ */
 
-    if( timesync == 0 ) {
-      // no timesync: write the entire payload to the fifo
-      if(length>0){
-        call CSN.set();
-        call CSN.clr();
-        writeTxFifo(data+header, length - 1);
-        state = STATE_BUSY_TX_2_RX_ON;
-        call CSN.set();
-      }
-    } else {
-      // timesync required: write the payload before the timesync bytes to the fifo
-      // TODO: we're assuming here that the timestamp is at the end of the message
-      call CSN.set();
-      call CSN.clr();
-      writeTxFifo(data+header, length - sizeof(timesync_relative) - 1);
-      call CSN.set();
-    }
-
-
-    // compute timesync
-    sfdTime = time;
-
-    // read both clocks
-    atomic {
-      time = call RadioAlarm.getNow();
-      time32 = call LocalTime.get();
-    }
-
-    // adjust time32 with the time elapsed since the GDO0 event
-    time -= sfdTime;
-    time32 -= time;
-
-    // adjust for delay between the STXON strobe and the transmission of the GDO0
-    time32 += TX_SFD_DELAY;
-
-    call PacketTimeStamp.set(msg, time32);
-
-    if( timesync != 0 ) {
-      // read and adjust the timestamp field
-      timesync_relative = (*(timesync_absolute_t*)timesync) - time32;
-
-      // write it to the fifo
-      // TODO: we're assuming here that the timestamp is at the end of the message
-      call CSN.set();
-      call CSN.clr();
-      writeTxFifo((uint8_t*)(&timesync_relative), sizeof(timesync_relative));
-      call CSN.set();
-      state = STATE_BUSY_TX_2_RX_ON;
-    }
 
 #ifdef RADIO_DEBUG_MESSAGES
     txMsg = msg;
 
     if( call DiagMsg.record() )
     {
-      length = getHeader(msg)->length;
+      length = call RadioPacket.payloadLength(msg);
 
       call DiagMsg.chr('t');
       call DiagMsg.uint16(call RadioAlarm.getNow());
@@ -877,9 +867,15 @@ implementation
       call DiagMsg.send();
     }
 #endif
-#endif
+    // now wait till it goes to RX
+    do{
+      status = getStatus();
+    }while(status.state != CC1101_STATE_RX);
+
+    txEnd = TRUE;
     // GDO0 capture interrupt will be triggered: we'll reenable interrupts from there
     // and clear the rx fifo -- should something have arrived in the meantime
+    call Tasklet.schedule();
     return SUCCESS;
   }
 
@@ -900,6 +896,9 @@ implementation
     /*  RADIO_ASSERT(FAIL);*/
     /*  signal RadioCCA.done(EBUSY);*/
     /*}*/
+
+#warning "CCA not implemented properly"
+    signal RadioCCA.done(SUCCESS);
     return SUCCESS;
   }
 
@@ -910,28 +909,10 @@ implementation
   inline cc1101_status_t enableReceiveGdo()
   {
     cc1101_status_t status;
-/*#ifdef RADIO_DEBUG*/
-/*    uint8_t gdo0_1, gdo0_2, gdo0_3;*/
-/*#endif*/
     atomic {
-/*#ifdef RADIO_DEBUG*/
-/*      gdo0_1 = call GDO0.get();*/
-/*#endif*/
-      // flush rx fifo
-      flushRxFifo();
-/*#ifdef RADIO_DEBUG*/
-/*      gdo0_2 = call GDO0.get();*/
-/*#endif*/
       // ready to receive new message: enable receive GDO0 capture
       call Gdo0Capture.captureRisingEdge();
-/*#ifdef RADIO_DEBUG*/
-/*      gdo0_3 = call GDO0.get();*/
-/*#endif*/
     }
-    // TODO: Add appropriate debugging asserts
-    /*RADIO_ASSERT(gdo0_1 == 0);*/
-    /*RADIO_ASSERT(gdo0_2 == 0);*/
-    /*RADIO_ASSERT(gdo0_3 == 0);*/
     return status;
   }
 
@@ -987,12 +968,12 @@ implementation
 
     sfdTime = capturedTime;
 
-    // data starts after the length field
-    data = getPayload(rxMsg) + sizeof(cc1101_header_t);
+    data = getPayload(rxMsg);
 
     // read the length byte
     readLengthFromRxFifo(&length);
 
+#ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
     {
       call DiagMsg.uint16(call RadioAlarm.getNow());
@@ -1005,6 +986,7 @@ implementation
       call DiagMsg.uint8(length);
       call DiagMsg.send();
     }
+#endif
     if (length < 3 || length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
       state = STATE_RX_ON;
@@ -1016,10 +998,10 @@ implementation
     // if we're here, length must be correct
     RADIO_ASSERT(length >= 3 && length <= call RadioPacket.maxPayloadLength() + 2);
 
-    getHeader(rxMsg)->length = length;
-
     // we'll read the FCS/CRC separately
     length -= 2;
+
+    getHeader(rxMsg)->length = length;
 
     // download the whole payload
     readPayloadFromRxFifo(data, length );
@@ -1047,6 +1029,18 @@ implementation
 
     // ready to receive new message: enable GDO0 interrupts
     enableReceiveGdo();
+#ifdef RADIO_DEBUG_MESSAGES
+    if( call DiagMsg.record() )
+    {
+      call DiagMsg.str("rmsg");
+      call DiagMsg.uint16(call RadioAlarm.getNow() - (uint16_t)call PacketTimeStamp.timestamp(rxMsg) );
+      call DiagMsg.uint16(call RadioAlarm.getNow());
+      call DiagMsg.uint16(call PacketTimeStamp.isValid(rxMsg) ? call PacketTimeStamp.timestamp(rxMsg) : 0);
+      call DiagMsg.int8(length);
+      call DiagMsg.hex8s(getPayload(rxMsg), length);
+      call DiagMsg.send();
+    }
+#endif
 
     // bail out if we're not interested in this message
     if( !signal RadioReceive.header(rxMsg) )
@@ -1124,19 +1118,16 @@ implementation
   //TODO
   async event void Gdo0Capture.captured( uint16_t time )
   {
-
-
-
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
-    RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
+    /*RADIO_ASSERT( ! txEnd ); // assert that there's no nesting*/
 
     call Gdo0Capture.disable();
 
     if(state == STATE_RX_ON) {
       rxGdo0 = TRUE;
       capturedTime = time;
-    } else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
-      txEnd = TRUE;
+    /*} else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
+      txEnd = TRUE; */
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1318,7 +1309,7 @@ implementation
 
   async command uint8_t RadioPacket.payloadLength(message_t* msg)
   {
-    return getHeader(msg)->length - 2;
+    return getHeader(msg)->length + 1;
   }
 
   async command void RadioPacket.setPayloadLength(message_t* msg, uint8_t length)
@@ -1327,7 +1318,9 @@ implementation
     RADIO_ASSERT( call RadioPacket.headerLength(msg) + length + call RadioPacket.metadataLength(msg) <= sizeof(message_t) );
 
     // we add the length of the CRC, which is automatically generated
-    getHeader(msg)->length = length + 2;
+    /*getHeader(msg)->length = length + 2;*/
+    // exclude the length byte
+    getHeader(msg)->length = length;
   }
 
   async command uint8_t RadioPacket.maxPayloadLength()
