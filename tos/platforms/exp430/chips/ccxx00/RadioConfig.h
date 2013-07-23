@@ -51,10 +51,10 @@ typedef uint16_t tradio_size;
  * beginning and end to ba able to handle longer wait periods.
  */
 //TODO: Determine this value
-#define RADIO_ALARM_MICROSEC	4UL
+#define RADIO_ALARM_MICROSEC	0.03125
 
 /**
  * The base two logarithm of the number of radio alarm ticks per one millisecond
  */
-#define RADIO_ALARM_MILLI_EXP	12UL
+#define RADIO_ALARM_MILLI_EXP	5
 #endif

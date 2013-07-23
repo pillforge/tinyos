@@ -428,7 +428,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -505,7 +505,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -582,7 +582,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts at the end of a received packet */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   /** FIFO Threshold is maxed so we don't try downloading incomplete pkts */
   CC1101_CONFIG_FIFOTHR = 0x0F,
@@ -661,7 +661,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts at the end of a received packet */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   /** FIFO Threshold is maxed so we don't try downloading incomplete pkts */
   CC1101_CONFIG_FIFOTHR = 0x0F,
@@ -740,7 +740,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -817,7 +817,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -894,7 +894,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -966,7 +966,7 @@ enum CC1101_config_reg_state_enums {
 enum CC1101_config_reg_state_enums {
     CC1101_CONFIG_IOCFG2    = 0x29,     // 0x00, GDO2 Output Pin Config
     CC1101_CONFIG_IOCFG1    = 0x2E,     // 0x01, GDO1 Output Pin Config
-    CC1101_CONFIG_IOCFG0    = 0x01,     // 0x02, GDO0 Output Pin Config
+    CC1101_CONFIG_IOCFG0    = 0x06,     // 0x02, GDO0 Output Pin Config
     CC1101_CONFIG_FIFOTHR   = 0x0F,     // 0x03, RX FIFO and TX FIFO Thresholds
     CC1101_CONFIG_SYNC1     = 0xD3,		// 0x04, Sync Word, High Byte
     CC1101_CONFIG_SYNC0     = 0x91,		// 0x05, Sync Word, Low Byte
@@ -1023,7 +1023,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,
@@ -1100,7 +1100,7 @@ enum CC1101_config_reg_state_enums {
   CC1101_CONFIG_IOCFG1 = 0x2E,
   
   /** GDO0 asserts when there is data in the RX FIFO */
-  CC1101_CONFIG_IOCFG0 = 0x01, 
+  CC1101_CONFIG_IOCFG0 = 0x06, 
   
   CC1101_CONFIG_FIFOTHR = 0x0F,
   CC1101_CONFIG_SYNC1 = 0xD3,

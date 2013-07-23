@@ -300,11 +300,17 @@ implementation
     int8_t value1 = 0, value2 = 0;
     cc1101_status_t status;
 
-    value1 = strobe(CC1101_SNOP).value;
+
+    RADIO_ASSERT( call SpiResource.isOwner() );
+
+    call CSN.set();
+    call CSN.clr();
+    value1 = call SpiByte.write(CC1101_CMD_REGISTER_WRITE | CC1101_SNOP);
     do {
       value2 = value1;
-      value1 = strobe(CC1101_SNOP).value;
+      value1 = call SpiByte.write(CC1101_CMD_REGISTER_WRITE | CC1101_SNOP);
     }while(value1 != value2);
+    call CSN.set();
 
     status.value = value1;
     return status;
@@ -729,44 +735,60 @@ implementation
 
   /*----------------- TRANSMIT -----------------*/
 
+  inline cc1101_status_t enableTransmitGdo()
+  {
+    cc1101_status_t status;
+    atomic {
+      // Finished sending message
+      call Gdo0Capture.captureFallingEdge();
+    }
+    return status;
+  }
   tasklet_async command error_t RadioSend.send(message_t* msg)
   {
     uint16_t time;
-    uint8_t p;
+    /*uint8_t p;*/
     uint8_t length;
     uint8_t* data;
-    uint8_t header;
-    uint32_t time32;
-    void* timesync;
-    timesync_relative_t timesync_relative;
-    uint32_t sfdTime;
+    /*
+     *uint8_t header;
+     *uint32_t time32;
+     *void* timesync;
+     *timesync_relative_t timesync_relative;
+     *uint32_t sfdTime;
+     */
     cc1101_status_t status;
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
+    call Leds.led2On();
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
       return EBUSY;
 
-    /*
-     *if( call Config.requiresRssiCca(msg) && !call CCA.get() )
-     *  return EBUSY;
-     */
+    status = getStatus();
+    if (status.state == CC1101_STATE_TXFIFO_UNDERFLOW){
+      RADIO_ASSERT(FALSE);
+      // flush tx fifo
+      strobe(CC1101_SFTX);
+      return EBUSY;
+    }
+    // start transmission
+    status = strobe(CC1101_STX);
 
+    // Do other useful things while we wait for TX state
     data = getPayload(msg);
     length = call RadioPacket.payloadLength(msg);
 
-    // start transmission
-    status = strobe(CC1101_STX);
-    // Wait until TX mode
-    do{
-      status = getStatus();
-    }while(status.state != CC1101_STATE_TX);
-
-    // first upload the header to gain some time
+    // Fill up the FIFO
     call CSN.set();
     call CSN.clr();
     writeTxFifo(data, length);
     call CSN.set();
+
+    // Check if in TX mode. If not in TX mode, CCA has failed
+    status = getStatus();
+    if (status.state != CC1101_STATE_TX)
+      return EBUSY;
 
     atomic {
 #ifdef RADIO_DEBUG
@@ -779,12 +801,11 @@ implementation
       time = call RadioAlarm.getNow();
 
       cmd = CMD_TRANSMIT;
-      state = STATE_TX_ON;
+      state = STATE_BUSY_TX_2_RX_ON;
 #ifdef RADIO_DEBUG
       sfd3 = call GDO0.get();
 #endif
-      /*call Gdo0Capture.captureFallingEdge();*/
-      call Gdo0Capture.disable();
+      call Gdo0Capture.captureFallingEdge();
 #ifdef RADIO_DEBUG
       sfd4 = call GDO0.get();
 #endif
@@ -867,15 +888,10 @@ implementation
       call DiagMsg.send();
     }
 #endif
-    // now wait till it goes to RX
-    do{
-      status = getStatus();
-    }while(status.state != CC1101_STATE_RX);
 
-    txEnd = TRUE;
     // GDO0 capture interrupt will be triggered: we'll reenable interrupts from there
     // and clear the rx fifo -- should something have arrived in the meantime
-    call Tasklet.schedule();
+    call Leds.led2Off();
     return SUCCESS;
   }
 
@@ -884,20 +900,13 @@ implementation
 
   /*----------------- CCA -----------------*/
 
+  // The CC1101 has TX-if-CCA. This feature allows for the CC1101 to enter its TX state only if clear channel
+  // requirements are met. Thus, we always return SUCCESS here and re-evaluate CCA when trying to transmit.
   tasklet_async command error_t RadioCCA.request()
   {
     if( cmd != CMD_NONE || state != STATE_RX_ON )
       return EBUSY;
 
-    /*if(call CCA.get()) {*/
-    /*  signal RadioCCA.done(SUCCESS);*/
-    /*} else {*/
-    /*  // TODO: remove this*/
-    /*  RADIO_ASSERT(FAIL);*/
-    /*  signal RadioCCA.done(EBUSY);*/
-    /*}*/
-
-#warning "CCA not implemented properly"
     signal RadioCCA.done(SUCCESS);
     return SUCCESS;
   }
@@ -1115,19 +1124,18 @@ implementation
   /*----------------- IRQ -----------------*/
 
   // RX GDO0 (rising edge) or end of TX (falling edge)
-  //TODO
   async event void Gdo0Capture.captured( uint16_t time )
   {
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
-    /*RADIO_ASSERT( ! txEnd ); // assert that there's no nesting*/
+    RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
 
     call Gdo0Capture.disable();
 
     if(state == STATE_RX_ON) {
       rxGdo0 = TRUE;
       capturedTime = time;
-    /*} else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
-      txEnd = TRUE; */
+    } else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
+      txEnd = TRUE; 
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1149,7 +1157,6 @@ implementation
     }
 #endif
 
-    call Leds.led2Toggle();
     // do the rest of the processing
     call Tasklet.schedule();
   }
@@ -1317,8 +1324,6 @@ implementation
     RADIO_ASSERT( 1 <= length && length <= 125 );
     RADIO_ASSERT( call RadioPacket.headerLength(msg) + length + call RadioPacket.metadataLength(msg) <= sizeof(message_t) );
 
-    // we add the length of the CRC, which is automatically generated
-    /*getHeader(msg)->length = length + 2;*/
     // exclude the length byte
     getHeader(msg)->length = length;
   }
