@@ -388,6 +388,15 @@ implementation
 
     return status;
   }
+  // The first byte in the RX fifo contains the length
+  // This assumes that this is called first before reading any of the bytes in the RX FIFO
+  /*
+   *inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr){
+   *  cc1101_status_t status;
+   *  status = readRxFifo(lengthPtr,1);
+   *  return status;
+   *}
+   */
 
   inline void readPayloadFromRxFifo(uint8_t* data, uint8_t length)
   {
@@ -746,7 +755,7 @@ implementation
   }
   tasklet_async command error_t RadioSend.send(message_t* msg)
   {
-    uint16_t time;
+    /*uint16_t time;*/
     /*uint8_t p;*/
     uint8_t length;
     uint8_t* data;
@@ -761,7 +770,7 @@ implementation
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
-    call Leds.led2On();
+    /*call Leds.led2On();*/
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
       return EBUSY;
 
@@ -777,7 +786,7 @@ implementation
 
     // Do other useful things while we wait for TX state
     data = getPayload(msg);
-    length = call RadioPacket.payloadLength(msg);
+    length = call RadioPacket.payloadLength(msg) + 1;
 
     // Fill up the FIFO
     call CSN.set();
@@ -798,7 +807,7 @@ implementation
       sfd2 = call GDO0.get();
 #endif
       // get a timestamp right after strobe returns
-      time = call RadioAlarm.getNow();
+      /*time = call RadioAlarm.getNow();*/
 
       cmd = CMD_TRANSMIT;
       state = STATE_BUSY_TX_2_RX_ON;
@@ -878,7 +887,7 @@ implementation
 
     if( call DiagMsg.record() )
     {
-      length = call RadioPacket.payloadLength(msg);
+      length = call RadioPacket.payloadLength(msg) + 1;
 
       call DiagMsg.chr('t');
       call DiagMsg.uint16(call RadioAlarm.getNow());
@@ -891,7 +900,7 @@ implementation
 
     // GDO0 capture interrupt will be triggered: we'll reenable interrupts from there
     // and clear the rx fifo -- should something have arrived in the meantime
-    call Leds.led2Off();
+    /*call Leds.led2Off();*/
     return SUCCESS;
   }
 
@@ -966,7 +975,7 @@ implementation
 
   inline void downloadMessage()
   {
-    uint8_t length;
+    uint8_t fifo_length;
     uint16_t crc = 1;
     uint8_t* data;
     uint8_t rssi;
@@ -979,8 +988,8 @@ implementation
 
     data = getPayload(rxMsg);
 
-    // read the length byte
-    readLengthFromRxFifo(&length);
+    // read the length of bytes in the RX FIFO
+    readLengthFromRxFifo(&fifo_length);
 
 #ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
@@ -992,11 +1001,11 @@ implementation
       call DiagMsg.str("c=");
       call DiagMsg.uint8(cmd);
       call DiagMsg.str("l=");
-      call DiagMsg.uint8(length);
+      call DiagMsg.uint8(fifo_length);
       call DiagMsg.send();
     }
 #endif
-    if (length < 3 || length > call RadioPacket.maxPayloadLength() + 2 ) {
+    if (fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
       state = STATE_RX_ON;
       cmd = CMD_NONE;
@@ -1005,15 +1014,18 @@ implementation
     }
 
     // if we're here, length must be correct
-    RADIO_ASSERT(length >= 3 && length <= call RadioPacket.maxPayloadLength() + 2);
+    RADIO_ASSERT(fifo_length >= 3 && fifo_length <= call RadioPacket.maxPayloadLength() + 2);
 
     // we'll read the FCS/CRC separately
-    length -= 2;
+    fifo_length -= 2;
 
-    getHeader(rxMsg)->length = length;
+    // The length does not include the length byte
+    getHeader(rxMsg)->length = fifo_length - 1;
 
+    // TODO: The payload contains the length byte, thus setting the length byte in the previous line of code is useless.
+    // Investigate if we should consider the length byte as part of the payload or not.
     // download the whole payload
-    readPayloadFromRxFifo(data, length );
+    readPayloadFromRxFifo(data, fifo_length );
 
     // the last two bytes are not the fsc, but RSSI(8), CRC_ON(1)+LQI(7)
     readRssiFromRxFifo(&rssi);
@@ -1045,8 +1057,8 @@ implementation
       call DiagMsg.uint16(call RadioAlarm.getNow() - (uint16_t)call PacketTimeStamp.timestamp(rxMsg) );
       call DiagMsg.uint16(call RadioAlarm.getNow());
       call DiagMsg.uint16(call PacketTimeStamp.isValid(rxMsg) ? call PacketTimeStamp.timestamp(rxMsg) : 0);
-      call DiagMsg.int8(length);
-      call DiagMsg.hex8s(getPayload(rxMsg), length);
+      call DiagMsg.int8(fifo_length);
+      call DiagMsg.hex8s(getPayload(rxMsg), fifo_length);
       call DiagMsg.send();
     }
 #endif
@@ -1081,11 +1093,11 @@ implementation
       }
     }
     //call PppIpv6.transmit(getPayload(rxMsg)+1,
-    //          length+4);
-    //length-1+ sizeof(ieee154_header_t));
-    //          length-1+ sizeof(cc1101packet_header_t));
+    //          fifo_length+4);
+    //fifo_length-1+ sizeof(ieee154_header_t));
+    //          fifo_length-1+ sizeof(cc1101packet_header_t));
     //call PppIpv6.transmit(rxMsg+1,
-    //          length -1 + sizeof(cc1101packet_header_t));
+    //          fifo_length -1 + sizeof(cc1101packet_header_t));
 #endif
 
     // signal reception only if it has passed the CRC check
@@ -1109,14 +1121,16 @@ implementation
         call DiagMsg.uint16(call RadioAlarm.getNow() - (uint16_t)call PacketTimeStamp.timestamp(rxMsg) );
         call DiagMsg.uint16(call RadioAlarm.getNow());
         call DiagMsg.uint16(call PacketTimeStamp.isValid(rxMsg) ? call PacketTimeStamp.timestamp(rxMsg) : 0);
-        call DiagMsg.int8(length);
-        call DiagMsg.hex8s(getPayload(rxMsg), length);
+        call DiagMsg.int8(fifo_length);
+        call DiagMsg.hex8s(getPayload(rxMsg), fifo_length);
         call DiagMsg.send();
       }
 #endif
       rxMsg = signal RadioReceive.receive(rxMsg);
 
+
     }
+    // TODO: Handle RX FIFO overflow
 
   }
 
@@ -1316,7 +1330,7 @@ implementation
 
   async command uint8_t RadioPacket.payloadLength(message_t* msg)
   {
-    return getHeader(msg)->length + 1;
+    return getHeader(msg)->length;
   }
 
   async command void RadioPacket.setPayloadLength(message_t* msg, uint8_t length)

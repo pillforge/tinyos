@@ -37,13 +37,13 @@
 
 typedef nx_struct cc1101packet_header_t
 {
-    cc1101_header_t cc1101;
-    ieee154_simple_header_t ieee154;
+    cc1101_header_t cc1101; // 1 byte
+    ieee154_simple_header_t ieee154; // 9 bytes
 #ifndef TFRAMES_ENABLED
-    network_header_t network;
+    network_header_t network; // 1 byte
 #endif
 #ifndef IEEE154FRAMES_ENABLED
-    activemessage_header_t am;
+    activemessage_header_t am; // 1 byte
 #endif
 } cc1101packet_header_t;
 

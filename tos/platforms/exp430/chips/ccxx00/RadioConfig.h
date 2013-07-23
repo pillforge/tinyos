@@ -31,6 +31,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Author: Miklos Maroti
+ * Author: Addisu Z. Taddese (Port to CC1101)
  */
 
 #ifndef __RADIOCONFIG_H__
@@ -50,11 +51,16 @@ typedef uint16_t tradio_size;
  * Ok, further hacks were required for deputy, I removed 00 from the
  * beginning and end to ba able to handle longer wait periods.
  */
-//TODO: Determine this value
 #define RADIO_ALARM_MICROSEC	0.03125
 
 /**
  * The base two logarithm of the number of radio alarm ticks per one millisecond
  */
 #define RADIO_ALARM_MILLI_EXP	5
+
+/**
+ * Setup the CC1101 to use 433MHz.
+ */
+#define CC1101_MATCHING_NETWORK CC1101_433_MHZ
+
 #endif
