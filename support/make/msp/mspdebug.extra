@@ -7,17 +7,29 @@ MSP_DEBUG_FLAGS ?= rf2500
 
 MSP_DEBUG ?= mspdebug
 
-program: FORCE
+MSP_SERIAL = ""
+ifneq ($(MSPDEBUG),"")
+expanded_serial := $(shell $(MSP_DEBUG) --usb-list | perl -e '$$r=shift; while(<>) { if(/\[serial: ($$r[0-9A-F]*)\]/i) { print $$1; exit; } }' $(MSPDEBUG))
+MSP_SERIAL = -s $(expanded_serial)
+MSPDEBUG_TARGETS += serialtest
+endif
+
+
+# Test if we have found a match
+serialtest: FORCE
+	@N=$(expanded_serial); [ x$$N = x ] && echo "    found no device that matches serial ($(MSPDEBUG))" && exit 1 || echo "    found device with serial $$N"
+
+program: $(MSPDEBUG_TARGETS) FORCE
 	@echo "    installing $(PLATFORM) binary using mspdebug"
-	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "prog $(INSTALL_IHEX)"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) $(MSP_SERIAL) "prog $(INSTALL_IHEX)"
 
-program_no_e: FORCE
+program_no_e: $(MSPDEBUG_TARGETS) FORCE
 	@echo "    installing $(PLATFORM) binary mspdebug (without mass erase)"
-	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "load $(INSTALL_IHEX)"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) $(MSP_SERIAL) "load $(INSTALL_IHEX)"
 
-program_bl: FORCE
+program_bl: $(MSPDEBUG_TARGETS) FORCE
 	@echo "    installing $(PLATFORM) bootloader using mspdebug"
-	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) "prog $(BOOTLOADER_IMG)"
+	$(MSP_DEBUG) $(MSP_DEBUG_FLAGS) $(MSP_SERIAL) "prog $(BOOTLOADER_IMG)"
 
 program_input: ihex
 	@:
