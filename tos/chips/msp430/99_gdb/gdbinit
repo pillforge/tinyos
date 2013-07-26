@@ -6,9 +6,10 @@ set remote memory-write-packet-size fixed
 set remote memory-read-packet-size 1024
 set remote memory-read-packet-size fixed
 
+
 #source ../../.gdb_x1
- source ../../.gdb_x2
-#source ../../.gdb_x5
+ #source ../../.gdb_x2
+source ../../.gdb_x5
 
 target remote localhost:2000
 
@@ -22,6 +23,15 @@ set pri ele 0
 #b SchedulerBasicP.nc:148
 #b VirtualizeTimerC.nc:81
 #dis
+#b CC1101DriverLayerP__RadioAlarm__fired
+#b CC1101DriverLayerP.nc:227
+#commands
+#p /x status
+#end
+
+#b CC1101DriverLayerP__Gdo0Capture__captured
+#b CC1101DriverLayerP__downloadMessage
+
 
 define nx
 fini
@@ -39,4 +49,13 @@ x/16i $pc
 end
 document npc
 display next (16) instructions from $pc
+end
+
+define rst
+monitor reset
+c
+end
+
+document rst
+Reset and run device
 end
