@@ -108,10 +108,12 @@ implementation
     STATE_IDLE = 3,
     STATE_IDLE_2_RX_ON = 4,
     STATE_RX_ON = 5,
-    STATE_BUSY_TX_2_RX_ON = 6,
-    STATE_IDLE_2_TX_ON = 7,
-    STATE_TX_ON = 8,
-    STATE_RX_DOWNLOAD = 9,
+    STATE_RX_WAIT_END_PKT = 6,
+    STATE_BUSY_TX_2_RX_ON = 7,
+    STATE_IDLE_2_TX_ON = 8,
+    STATE_TX_ON = 9,
+    STATE_RX_DOWNLOAD = 10,
+    STATE_RX_INVALID = 11,
   };
   norace uint8_t state = STATE_POR;
 
@@ -127,6 +129,7 @@ implementation
     CMD_CHANNEL = 7,    // changing the channel
     CMD_SIGNAL_DONE = 8,  // signal the end of the state transition
     CMD_DOWNLOAD = 9,   // download the received message
+    CMD_RX_FLUSH = 10,   // Fluch RX FIFO
   };
   tasklet_norace uint8_t cmd = CMD_NONE;
 
@@ -364,10 +367,11 @@ implementation
   }
 
 
-  inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr)
+  inline cc1101_status_t readLengthFromRxBytes(uint8_t* lengthPtr)
   {
     cc1101_status_t status;
     uint8_t pkt_status;
+    uint8_t length1, length2;
 
     RADIO_ASSERT( call SpiResource.isOwner() );
     RADIO_ASSERT( call CSN.get() == 1 );
@@ -376,34 +380,43 @@ implementation
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
+    // For debugging using Logic Analyzer
     burstRead(CC1101_PKTSTATUS, &pkt_status, 1);
 
     /*status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE | CC1101_RXBYTES);*/
     /**lengthPtr = call SpiByte.write(0);*/
 
-    status = burstRead(CC1101_RXBYTES, lengthPtr, 1);
+    status = burstRead(CC1101_RXBYTES, &length1, 1);
+    do {
+      length2 = length1;
+      status = burstRead(CC1101_RXBYTES, &length1, 1);
+    }while(length1 != length2);
 
     RADIO_ASSERT(status.chip_rdyn == 0);
     RADIO_ASSERT(status.state == CC1101_STATE_RX);
+
+    *lengthPtr = length1;
 
     return status;
   }
   // The first byte in the RX fifo contains the length
   // This assumes that this is called first before reading any of the bytes in the RX FIFO
-  /*
-   *inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr){
-   *  cc1101_status_t status;
-   *  status = readRxFifo(lengthPtr,1);
-   *  return status;
-   *}
-   */
+  inline cc1101_status_t readLengthFromRxFifo(uint8_t* lengthPtr){
+    cc1101_status_t status;
+    call CSN.set(); // set CSN, just in clase it's not set
+    call CSN.clr(); // clear CSN, starting a multi-byte SPI command
+    status = readRxFifo(lengthPtr,1);
+    /*call CSN.set(); // set CSN, just in clase it's not set*/
+    /*call CSN.clr(); // clear CSN, starting a multi-byte SPI command*/
+    return status;
+  }
 
   inline void readPayloadFromRxFifo(uint8_t* data, uint8_t length)
   {
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
 
-    readRxFifo(data, length);
+    call SpiBlock.transfer(NULL, data, length);
   }
 
   inline void readRssiFromRxFifo(uint8_t* rssiPtr)
@@ -425,9 +438,19 @@ implementation
     call CSN.set();
   }
 
+  inline cc1101_status_t waitForState(uint8_t st, uint8_t timeout) {
+    cc1101_status_t status;
+    uint8_t counter = 0;
+    do {
+      status = getStatus();
+      counter++;
+    }while(status.state != st && counter < timeout);
+    return status;
+  }
   inline cc1101_status_t flushRxFifo() {
-
-    return strobe(CC1101_SFRX);
+    strobe(CC1101_SFRX);
+    strobe(CC1101_SRX);
+    return waitForState(CC1101_STATE_RX, 0xff);
   }
 
   /*----------------- INIT -----------------*/
@@ -489,6 +512,7 @@ implementation
       if(timeout > 10000) {
         strobe(CC1101_SRES);
         call CSN.clr();
+        timeout = 0;
       }
     }
     // The chip is ready. XOSC is stable.
@@ -635,7 +659,6 @@ implementation
       call CSN.clr();
       burstWrite(0x0, configRegs, configRegSize);
       call CSN.set();
-
       state = STATE_IDLE;
       call Tasklet.schedule();
     }
@@ -644,6 +667,8 @@ implementation
       // setChannel was ignored in SLEEP because the SPI was not working, so do it here
       /*setChannel();*/
 
+      // Flush anything that might be in the RX FIFO
+      strobe(CC1101_SFRX);
       // start receiving
       strobe(CC1101_SRX);
       call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
@@ -770,7 +795,6 @@ implementation
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
-    /*call Leds.led2On();*/
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
       return EBUSY;
 
@@ -786,6 +810,8 @@ implementation
 
     // Do other useful things while we wait for TX state
     data = getPayload(msg);
+    // The length byte does not count itself so add one here in order to send the
+    // right number of bytes to the TXFIFO
     length = call RadioPacket.payloadLength(msg) + 1;
 
     // Fill up the FIFO
@@ -814,11 +840,13 @@ implementation
 #ifdef RADIO_DEBUG
       sfd3 = call GDO0.get();
 #endif
-      call Gdo0Capture.captureFallingEdge();
+      /*call Gdo0Capture.captureFallingEdge();*/
 #ifdef RADIO_DEBUG
       sfd4 = call GDO0.get();
 #endif
     }
+    waitForState(CC1101_STATE_RX, 0xff);
+    txEnd = TRUE;
 
 #ifdef RADIO_DEBUG
     RADIO_ASSERT(sfd1 == 0);
@@ -827,6 +855,7 @@ implementation
     RADIO_ASSERT(sfd4 == 0);
 #endif
 
+    //TODO: implement timesync
 /*
  *    timesync = call PacketTimeSyncOffset.isSet(msg) ? ((void*)msg) + call PacketTimeSyncOffset.get(msg) : 0;
  *
@@ -901,6 +930,7 @@ implementation
     // GDO0 capture interrupt will be triggered: we'll reenable interrupts from there
     // and clear the rx fifo -- should something have arrived in the meantime
     /*call Leds.led2Off();*/
+    call Tasklet.schedule();
     return SUCCESS;
   }
 
@@ -930,6 +960,7 @@ implementation
     atomic {
       // ready to receive new message: enable receive GDO0 capture
       call Gdo0Capture.captureRisingEdge();
+      /*call Gdo0Capture.captureFallingEdge();*/
     }
     return status;
   }
@@ -982,14 +1013,19 @@ implementation
     uint8_t crc_ok_lqi;
     uint16_t sfdTime;
 
+    cc1101_status_t status;
+
+    status = getStatus();
+
     state = STATE_RX_DOWNLOAD;
 
     sfdTime = capturedTime;
 
-    data = getPayload(rxMsg);
+    // data starts after the length field
+    data = getPayload(rxMsg) + sizeof(cc1101_header_t);
 
     // read the length of bytes in the RX FIFO
-    readLengthFromRxFifo(&fifo_length);
+    status = readLengthFromRxFifo(&fifo_length);
 
 #ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
@@ -1009,6 +1045,7 @@ implementation
       // bad length: bail out
       state = STATE_RX_ON;
       cmd = CMD_NONE;
+      call CSN.set();
       enableReceiveGdo();
       return;
     }
@@ -1016,11 +1053,8 @@ implementation
     // if we're here, length must be correct
     RADIO_ASSERT(fifo_length >= 3 && fifo_length <= call RadioPacket.maxPayloadLength() + 2);
 
-    // we'll read the FCS/CRC separately
-    fifo_length -= 2;
-
     // The length does not include the length byte
-    getHeader(rxMsg)->length = fifo_length - 1;
+    getHeader(rxMsg)->length = fifo_length;
 
     // TODO: The payload contains the length byte, thus setting the length byte in the previous line of code is useless.
     // Investigate if we should consider the length byte as part of the payload or not.
@@ -1049,7 +1083,10 @@ implementation
     cmd = CMD_NONE;
 
     // ready to receive new message: enable GDO0 interrupts
-    enableReceiveGdo();
+    // If RX FIFO overflowed, we have to flush it before we enable interrupts
+    if(status.state != CC1101_STATE_RXFIFO_OVERFLOW)
+      enableReceiveGdo();
+
 #ifdef RADIO_DEBUG_MESSAGES
     if( call DiagMsg.record() )
     {
@@ -1131,6 +1168,11 @@ implementation
 
     }
     // TODO: Handle RX FIFO overflow
+    if(status.state == CC1101_STATE_RXFIFO_OVERFLOW){
+      // flush rx fifo
+      flushRxFifo();
+      enableReceiveGdo();
+    }
 
   }
 
@@ -1140,16 +1182,27 @@ implementation
   // RX GDO0 (rising edge) or end of TX (falling edge)
   async event void Gdo0Capture.captured( uint16_t time )
   {
+    uint8_t gdo0_val;
+    call Gdo0Capture.disable();
+    call Leds.led2On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
-
-    call Gdo0Capture.disable();
+  
+    gdo0_val = call GDO0.get();
 
     if(state == STATE_RX_ON) {
-      rxGdo0 = TRUE;
-      capturedTime = time;
-    } else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON) {
-      txEnd = TRUE; 
+      if(gdo0_val){
+        capturedTime = time;
+        call Gdo0Capture.captureFallingEdge();
+        call Leds.led0On();
+        call Leds.led0Off();
+      }else{
+        rxGdo0 = TRUE;
+        call Leds.led0On();
+        call Leds.led0Off();
+        call Leds.led0On();
+        call Leds.led0Off();
+      }
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1173,6 +1226,7 @@ implementation
 
     // do the rest of the processing
     call Tasklet.schedule();
+    call Leds.led2Off();
   }
 
 
@@ -1230,7 +1284,9 @@ implementation
         cmd = CMD_NONE;
 
         // a packet might have been received since the end of the transmission
-        status = enableReceiveGdo();
+        enableReceiveGdo();
+
+        status = getStatus();
 
 #if defined(RADIO_DEBUG_IRQ) && defined(RADIO_DEBUG_MESSAGES)
         if( call DiagMsg.record() )
@@ -1264,12 +1320,18 @@ implementation
       // incoming packet
       if( isSpiAcquired() )
       {
+        cc1101_status_t status;
+        status = getStatus();
         rxGdo0 = FALSE;
-
-        RADIO_ASSERT(state == STATE_RX_ON);
         RADIO_ASSERT(cmd == CMD_NONE);
 
-        cmd = CMD_DOWNLOAD;
+        if (status.state == CC1101_STATE_RXFIFO_OVERFLOW)
+          cmd = CMD_RX_FLUSH;
+        else{
+          cmd = CMD_DOWNLOAD;
+          state = STATE_RX_ON;
+        }
+
       }
       else
         RADIO_ASSERT(FALSE);
@@ -1280,7 +1342,15 @@ implementation
     {
       if( cmd == CMD_DOWNLOAD ) {
         RADIO_ASSERT(state == STATE_RX_ON);
-        downloadMessage();
+        /*do{*/
+          downloadMessage();
+        /*}while(call GDO0.get());*/
+      }
+      else if (cmd == CMD_RX_FLUSH){
+        flushRxFifo();
+        state = STATE_RX_ON;
+        enableReceiveGdo();
+        cmd = CMD_NONE;
       }
       else if( CMD_TURNOFF <= cmd && cmd <= CMD_TURNON )
         changeState();
