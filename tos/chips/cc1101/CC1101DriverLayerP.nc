@@ -493,19 +493,8 @@ implementation
     return call SpiResource.request();
   }
 
-  inline void resetRadio() {
-    uint16_t timeout;
-
-    // Go through reset procedure
-    call CSN.set();
-    call BusyWait.wait(30);
-    call CSN.clr();
-    call BusyWait.wait(30);
-    call CSN.set();
-    call BusyWait.wait(45);
-
-    call CSN.clr();
-    timeout = 0;
+  inline void waitChipRdyn(){
+    uint16_t timeout = 0;
     // wait for CHIP_RDYn pin to go low
     while(call GDO2.get()) {
       timeout++;
@@ -515,6 +504,19 @@ implementation
         timeout = 0;
       }
     }
+  }
+
+  inline void resetRadio() {
+    // Go through reset procedure
+    call CSN.set();
+    call BusyWait.wait(30);
+    call CSN.clr();
+    call BusyWait.wait(30);
+    call CSN.set();
+    call BusyWait.wait(45);
+
+    call CSN.clr();
+    waitChipRdyn();
     // The chip is ready. XOSC is stable.
 
     // Strobe SRES
@@ -527,6 +529,21 @@ implementation
     strobe(CC1101_SPWD);
 
     state = STATE_PD;
+  }
+
+  inline void resetRx(){
+    call Leds.led0On();
+    call CSN.set();
+    call CSN.clr();
+    /*strobe(CC1101_SRES);*/
+    /*waitChipRdyn();*/
+    strobe(CC1101_SIDLE);
+    waitForState(CC1101_STATE_IDLE, 0xff);
+    strobe(CC1101_SRX);
+    waitForState(CC1101_STATE_RX, 0xff);
+    state = STATE_RX_ON;
+    cmd = CMD_NONE;
+    call Leds.led0Off();
   }
 
 
@@ -822,8 +839,10 @@ implementation
 
     // Check if in TX mode. If not in TX mode, CCA has failed
     status = getStatus();
-    if (status.state != CC1101_STATE_TX)
+    if (status.state != CC1101_STATE_TX){
+      resetRx();
       return EBUSY;
+    }
 
     atomic {
 #ifdef RADIO_DEBUG
@@ -845,8 +864,14 @@ implementation
       sfd4 = call GDO0.get();
 #endif
     }
-    waitForState(CC1101_STATE_RX, 0xff);
-    txEnd = TRUE;
+    status = waitForState(CC1101_STATE_RX, 0xff);
+    if(status.state == CC1101_STATE_RX)
+      txEnd = TRUE;
+    else {
+      // Transmission has failed
+      resetRx();
+      return EBUSY;
+    }
     /*enableTransmitGdo();*/
 
 #ifdef RADIO_DEBUG
@@ -1044,10 +1069,7 @@ implementation
 #endif
     if (fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
-      state = STATE_RX_ON;
-      cmd = CMD_NONE;
-      call CSN.set();
-      enableReceiveGdo();
+      resetRx();
       return;
     }
 
@@ -1189,21 +1211,21 @@ implementation
     call Leds.led2On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
-  
+
     gdo0_val = call GDO0.get();
 
     if(state == STATE_RX_ON) {
       if(gdo0_val){
         capturedTime = time;
         call Gdo0Capture.captureFallingEdge();
-        call Leds.led0On();
-        call Leds.led0Off();
+        /*call Leds.led0On();*/
+        /*call Leds.led0Off();*/
       }else{
         rxGdo0 = TRUE;
-        call Leds.led0On();
-        call Leds.led0Off();
-        call Leds.led0On();
-        call Leds.led0Off();
+        /*call Leds.led0On();*/
+        /*call Leds.led0Off();*/
+        /*call Leds.led0On();*/
+        /*call Leds.led0Off();*/
       }
     }else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON){
         txEnd = TRUE;
