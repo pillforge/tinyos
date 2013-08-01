@@ -61,6 +61,16 @@ typedef uint16_t tradio_size;
 /**
  * Setup the CC1101 to use 433MHz.
  */
+#ifndef CC1101_MATCHING_NETWORK 
 #define CC1101_MATCHING_NETWORK CC1101_433_MHZ
+#endif
+
+#ifndef SOFTWAREACK_TIMEOUT
+#define SOFTWAREACK_TIMEOUT 2000
+#endif
+
+#ifndef CC1101_BAUD
+#define CC1101_BAUD CC1101_500K
+#endif
 
 #endif

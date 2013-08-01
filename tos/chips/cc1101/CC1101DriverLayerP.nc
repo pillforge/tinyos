@@ -847,6 +847,7 @@ implementation
     }
     waitForState(CC1101_STATE_RX, 0xff);
     txEnd = TRUE;
+    /*enableTransmitGdo();*/
 
 #ifdef RADIO_DEBUG
     RADIO_ASSERT(sfd1 == 0);
@@ -1184,6 +1185,7 @@ implementation
   {
     uint8_t gdo0_val;
     call Gdo0Capture.disable();
+    call Leds.led2Off();
     call Leds.led2On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
@@ -1203,6 +1205,8 @@ implementation
         call Leds.led0On();
         call Leds.led0Off();
       }
+    }else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON){
+        txEnd = TRUE;
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1226,6 +1230,7 @@ implementation
 
     // do the rest of the processing
     call Tasklet.schedule();
+    call Leds.led2On();
     call Leds.led2Off();
   }
 

@@ -7,6 +7,8 @@ MSP_DEBUG_FLAGS ?= rf2500
 
 MSP_DEBUG ?= mspdebug
 
+MSPDEBUG ?= ""
+
 MSP_SERIAL = ""
 ifneq ($(MSPDEBUG),"")
 expanded_serial := $(shell $(MSP_DEBUG) --usb-list | perl -e '$$r=shift; while(<>) { if(/\[serial: ($$r[0-9A-F]*)\]/i) { print $$1; exit; } }' $(MSPDEBUG))
