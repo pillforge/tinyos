@@ -855,7 +855,7 @@ implementation
     // We could start loading the FIFO in theory, but in practice, this might lead to a situation where if the previous
     // transmission failed, the next time we try to transmit, we send out the data that was previously loaded in the
     // fifo.
-    status = waitForState(CC1101_STATE_TX, 0xff);
+    status = waitForState(CC1101_STATE_TX, 0x5);
     if(status.state != CC1101_STATE_TX){
       // Transmission has failed
       resetRx();
