@@ -54,6 +54,7 @@ module CC1101DriverLayerP
     interface CC1101DriverConfig as Config;
 
     interface SpiByte;
+    interface SpiPacket;
     interface SpiBlock;
     interface GeneralIO as CSN;
     interface GeneralIO as GDO0;
@@ -91,7 +92,7 @@ implementation
 
   void* getPayload(message_t* msg)
   {
-    return ((void*)msg);
+    return ((void*)msg) + sizeof(cc1101_header_t);
   }
 
   cc1101_metadata_t* getMeta(message_t* msg)
@@ -129,7 +130,8 @@ implementation
     CMD_CHANNEL = 7,    // changing the channel
     CMD_SIGNAL_DONE = 8,  // signal the end of the state transition
     CMD_DOWNLOAD = 9,   // download the received message
-    CMD_RX_FLUSH = 10,   // Fluch RX FIFO
+    CMD_FINISH_DOWNLOAD = 10,   // finish downloading the received message
+    CMD_RX_FLUSH = 11,   // Fluch RX FIFO
   };
   tasklet_norace uint8_t cmd = CMD_NONE;
 
@@ -220,11 +222,15 @@ implementation
 
   inline cc1101_status_t getStatus();
   inline cc1101_status_t enableReceiveGdo();
+  inline void finishDownload();
+  inline cc1101_status_t readRxFifo(uint8_t* data, uint8_t length);
+  inline cc1101_status_t readLengthFromRxBytes(uint8_t* lengthPtr);
 
   /*----------------- ALARM -----------------*/
   tasklet_async event void RadioAlarm.fired()
   {
     cc1101_status_t status;
+    uint8_t rxbytes;
     if( state == STATE_IDLE_2_RX_ON ) {
       status = getStatus();
 #ifdef RADIO_DEBUG_STATE
@@ -251,6 +257,14 @@ implementation
       if (status.state == CC1101_STATE_RX){
         state = STATE_RX_ON;
         cmd = CMD_SIGNAL_DONE;
+
+        while(1){
+          readLengthFromRxBytes(&rxbytes);
+          if(rxbytes > 0){
+            readRxFifo(NULL, rxbytes);
+          }else
+            break;
+        }
         // in receive mode, enable GDO0 capture
         enableReceiveGdo();
       } else {
@@ -374,8 +388,6 @@ implementation
     uint8_t length1, length2;
 
     RADIO_ASSERT( call SpiResource.isOwner() );
-    RADIO_ASSERT( call CSN.get() == 1 );
-
 
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
@@ -398,6 +410,7 @@ implementation
     *lengthPtr = length1;
 
     return status;
+    call CSN.set(); // set CSN, just in clase it's not set
   }
   // The first byte in the RX fifo contains the length
   // This assumes that this is called first before reading any of the bytes in the RX FIFO
@@ -405,7 +418,8 @@ implementation
     cc1101_status_t status;
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
-    status = readRxFifo(lengthPtr,1);
+    status.value = call SpiByte.write(CC1101_RXFIFO | CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE);
+    *lengthPtr = call SpiByte.write(0);
     /*call CSN.set(); // set CSN, just in clase it's not set*/
     /*call CSN.clr(); // clear CSN, starting a multi-byte SPI command*/
     return status;
@@ -416,7 +430,13 @@ implementation
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
 
-    call SpiBlock.transfer(NULL, data, length);
+    call SpiPacket.send(NULL, data, length);
+    /*call SpiBlock.transfer(NULL, data, length);*/
+  }
+
+  async event void SpiPacket.sendDone( uint8_t* txBuf, uint8_t* rxBuf, uint16_t len, error_t error ){
+    cmd = CMD_FINISH_DOWNLOAD;
+    call Tasklet.schedule();
   }
 
   inline void readRssiFromRxFifo(uint8_t* rssiPtr)
@@ -532,7 +552,7 @@ implementation
   }
 
   inline void resetRx(){
-    call Leds.led0On();
+    /*call Leds.led0On();*/
     call CSN.set();
     call CSN.clr();
     /*strobe(CC1101_SRES);*/
@@ -543,7 +563,7 @@ implementation
     waitForState(CC1101_STATE_RX, 0xff);
     state = STATE_RX_ON;
     cmd = CMD_NONE;
-    call Leds.led0Off();
+    /*call Leds.led0Off();*/
   }
 
 
@@ -686,6 +706,7 @@ implementation
 
       // Flush anything that might be in the RX FIFO
       strobe(CC1101_SFRX);
+      strobe(CC1101_SFTX);
       // start receiving
       strobe(CC1101_SRX);
       call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
@@ -829,9 +850,22 @@ implementation
     data = getPayload(msg);
     // The length byte does not count itself so add one here in order to send the
     // right number of bytes to the TXFIFO
-    length = call RadioPacket.payloadLength(msg) + 1;
+    length = call RadioPacket.payloadLength(msg);
+
+    // We could start loading the FIFO in theory, but in practice, this might lead to a situation where if the previous
+    // transmission failed, the next time we try to transmit, we send out the data that was previously loaded in the
+    // fifo.
+    status = waitForState(CC1101_STATE_TX, 0xff);
+    if(status.state != CC1101_STATE_TX){
+      // Transmission has failed
+      resetRx();
+      return EBUSY;
+    }
 
     // Fill up the FIFO
+    call CSN.set();
+    call CSN.clr();
+    writeTxFifo(&length, 1);
     call CSN.set();
     call CSN.clr();
     writeTxFifo(data, length);
@@ -1033,25 +1067,15 @@ implementation
   inline void downloadMessage()
   {
     uint8_t fifo_length;
-    uint16_t crc = 1;
     uint8_t* data;
-    uint8_t rssi;
-    uint8_t crc_ok_lqi;
-    uint16_t sfdTime;
-
-    cc1101_status_t status;
-
-    status = getStatus();
 
     state = STATE_RX_DOWNLOAD;
 
-    sfdTime = capturedTime;
-
     // data starts after the length field
-    data = getPayload(rxMsg) + sizeof(cc1101_header_t);
+    data = getPayload(rxMsg);
 
     // read the length of bytes in the RX FIFO
-    status = readLengthFromRxFifo(&fifo_length);
+    readLengthFromRxFifo(&fifo_length);
 
 #ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
@@ -1079,32 +1103,36 @@ implementation
     // The length does not include the length byte
     getHeader(rxMsg)->length = fifo_length;
 
-    // TODO: The payload contains the length byte, thus setting the length byte in the previous line of code is useless.
-    // Investigate if we should consider the length byte as part of the payload or not.
-    // download the whole payload
     readPayloadFromRxFifo(data, fifo_length );
+  }
 
+  inline void finishDownload(){
+    cc1101_status_t status;
+    uint8_t rssi;
+    uint16_t crc = 1;
+    uint8_t crc_ok_lqi;
+    uint16_t sfdTime;
+    uint8_t rxbytes;
+    /*uint8_t fifo_length = getHeader(rxMsg)->length ;*/
+    
+    sfdTime = capturedTime;
     // the last two bytes are not the fsc, but RSSI(8), CRC_ON(1)+LQI(7)
     readRssiFromRxFifo(&rssi);
     readCrcOkAndLqiFromRxFifo(&crc_ok_lqi);
 
-    /* UNCOMMENT THIS CODE IF THERE ARE TIMESTAMPING ERRORS
-    // there are still bytes in the fifo or if there's an overflow, flush rx fifo
-    if (call FIFOP.get() == 1 || call FIFO.get() == 1 || call GDO0.get() == 1) {
-    RADIO_ASSERT(FALSE);
-
-    state = STATE_RX_ON;
-    cmd = CMD_NONE;
-
-    RADIO_ASSERT(call GDO0.get() == 0);
-    enableReceiveGdo();
-    return;
+    // Read the rest of the bytes in the FIFO, if there are any, per the CC1101 errata
+    while(1){
+      readLengthFromRxBytes(&rxbytes);
+      if(rxbytes > 0){
+        readRxFifo(NULL, rxbytes);
+      }else
+        break;
     }
-     */
 
     state = STATE_RX_ON;
     cmd = CMD_NONE;
 
+    status = getStatus();
     // ready to receive new message: enable GDO0 interrupts
     // If RX FIFO overflowed, we have to flush it before we enable interrupts
     if(status.state != CC1101_STATE_RXFIFO_OVERFLOW)
@@ -1186,7 +1214,9 @@ implementation
         call DiagMsg.send();
       }
 #endif
+      call Leds.led0On();
       rxMsg = signal RadioReceive.receive(rxMsg);
+      call Leds.led0Off();
 
 
     }
@@ -1372,6 +1402,10 @@ implementation
         /*do{*/
           downloadMessage();
         /*}while(call GDO0.get());*/
+      }
+      else if (cmd == CMD_FINISH_DOWNLOAD){
+        RADIO_ASSERT(state == STATE_RX_DOWNLOAD);
+        finishDownload();
       }
       else if (cmd == CMD_RX_FLUSH){
         flushRxFifo();

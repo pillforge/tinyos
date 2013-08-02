@@ -27,6 +27,7 @@ configuration HplCC1101C {
     interface Resource as SpiResource;
     interface SpiByte;
     interface SpiBlock;
+    interface SpiPacket;
     interface GeneralIO as CSN;
     interface GeneralIO as GDO0;
     interface GeneralIO as GDO2;
@@ -59,6 +60,7 @@ implementation {
   SpiResource = SpiC.Resource;
   SpiByte = SpiC;
   SpiBlock = SpiC;
+  SpiPacket = SpiC;
 
   components HplRadioSpiP;
   SpiC.Msp430UsciConfigure -> HplRadioSpiP;

@@ -100,6 +100,7 @@ implementation
   DriverLayerP.SpiResource -> HplC.SpiResource;
   DriverLayerP.SpiByte -> HplC;
   DriverLayerP.SpiBlock -> HplC;
+  DriverLayerP.SpiPacket-> HplC;
 
   DriverLayerP.Gdo0Capture -> HplC;
 
