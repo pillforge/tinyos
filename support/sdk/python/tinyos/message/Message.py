@@ -95,7 +95,7 @@ class Message:
         else:
             endian = "<"
             
-        temp = self.data[byteOffset:byteOffset + (length >> 3)]
+        temp = bytearray(self.data[byteOffset:byteOffset + (length >> 3)])
 
         if length == 8:
             return struct.unpack("B", temp)[0]

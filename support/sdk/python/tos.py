@@ -313,10 +313,11 @@ class HDLC:
             return "Ack seqno: %d" % (rpacket.seqno)
         else:
             rpacket = ActiveMessage(f.data)
-            return "D: %04x S: %04x L: %02x G: %02x T: %02x | %s" % \
-                   (rpacket.destination, rpacket.source,
-                    rpacket.length, rpacket.group, rpacket.type,
-                    list2hex(rpacket.data))
+            #return "D: %04x S: %04x L: %02x G: %02x T: %02x | %s" % \
+                   #(rpacket.destination, rpacket.source,
+                    #rpacket.length, rpacket.group, rpacket.type,
+                    #list2hex(rpacket.data))
+            return "%s" % (list2hex(rpacket.data))
 
     def _crc16(self, base_crc, frame_data):
         crc = base_crc
@@ -722,13 +723,18 @@ class ActiveMessage(Packet):
             packet = None
 
         Packet.__init__(self,
-                        [('destination', 'int', 2),
-                         ('source',      'int', 2),
+                        [
                          ('length',      'int', 1),
-                         ('group',       'int', 1),
+                         ('fcf',         'int', 2),
+                         ('dsn',         'int', 1),
+                         ('destpan',     'int', 2),
+                         ('dest',        'int', 2),
+                         ('src',         'int', 2),
+                         ('network',     'int', 1),
                          ('type',        'int', 1),
-                         ('data',        'blob', None)],
+                         ('data',        'blob', 2)],
                         payload)
+        #print payload
         if payload == None:
             self.destination = dest
             self.source = 0x0000
