@@ -115,6 +115,7 @@ implementation
     STATE_TX_ON = 9,
     STATE_RX_DOWNLOAD = 10,
     STATE_RX_INVALID = 11,
+    STATE_RX_ON_2_IDLE= 12,
   };
   norace uint8_t state = STATE_POR;
 
@@ -261,7 +262,9 @@ implementation
         while(1){
           readLengthFromRxBytes(&rxbytes);
           if(rxbytes > 0){
+            call CSN.clr();
             readRxFifo(NULL, rxbytes);
+            call CSN.set();
           }else
             break;
         }
@@ -270,11 +273,19 @@ implementation
       } else {
         call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
       }
+    } else if(state == STATE_RX_ON_2_IDLE){
+      status = getStatus();
+      if (status.state == CC1101_STATE_IDLE){
+        state = STATE_IDLE;
+      }
     } else
       RADIO_ASSERT(FALSE);
 
     // make sure the rest of the command processing is called
     call Tasklet.schedule();
+    call Leds.led2Off();
+    call Leds.led2On();
+    call Leds.led2Off();
   }
 
   /*----------------- REGISTER -----------------*/
@@ -409,8 +420,8 @@ implementation
 
     *lengthPtr = length1;
 
-    return status;
     call CSN.set(); // set CSN, just in clase it's not set
+    return status;
   }
   // The first byte in the RX fifo contains the length
   // This assumes that this is called first before reading any of the bytes in the RX FIFO
@@ -572,7 +583,7 @@ implementation
     resetRadio();
 
     /*txPower = CC1101_DEF_RFPOWER & CC1101_TX_PWR_MASK;*/
-    /*channel = CC1101_DEF_CHANNEL & CC1101_CHANNEL_MASK;*/
+    channel = CC1101_DEFAULT_CHANNEL & CC1101_CHANNEL_MASK;
 
   }
 
@@ -619,33 +630,25 @@ implementation
 
   tasklet_async command error_t RadioState.setChannel(uint8_t c)
   {
-/*
- *    c &= CC1101_CHANNEL_MASK;
- *
- *    if( cmd != CMD_NONE )
- *      return EBUSY;
- *    else if( channel == c )
- *      return EALREADY;
- *
- *    channel = c;
- *    cmd = CMD_CHANNEL;
- *    call Tasklet.schedule();
- *
- *    return SUCCESS;
- */
+    call Leds.led1On();
+    c &= CC1101_CHANNEL_MASK;
+
+    if( cmd != CMD_NONE )
+      return EBUSY;
+    else if( channel == c )
+      return EALREADY;
+
+    channel = c;
+    cmd = CMD_CHANNEL;
+    call Tasklet.schedule();
+
+    return SUCCESS;
   }
 
   //TODO: Support setting channels
   inline void setChannel()
   {
-/*
- *    cc1101_fsctrl_t fsctrl;
- *    // set up freq
- *    fsctrl= cc1101_fsctrl_default;
- *    fsctrl.f.freq = 357+5*(channel - 11);
- *
- *    writeRegister(CC1101_FSCTRL, fsctrl.value);
- */
+    writeRegister(CC1101_CHANNR, channel);
   }
 
   inline void changeChannel()
@@ -653,16 +656,26 @@ implementation
     RADIO_ASSERT( cmd == CMD_CHANNEL );
     RADIO_ASSERT( state == STATE_PD || state == STATE_IDLE || ( state == STATE_RX_ON && call RadioAlarm.isFree()));
 
-    if( isSpiAcquired() )
+    if( isSpiAcquired() && call RadioAlarm.isFree())
     {
-      setChannel();
-
-      if( state == STATE_RX_ON ) {
-        call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+      //We have to guard this here with RadioAlarm.isFree() because this function gets called again from the
+      //tasklet when radio alarm fires, but before the radio alarm handler runs. If we don't have the guard, this
+      //becomes an infinite loop.
+      if (state == STATE_IDLE){
+        setChannel();
+        // Flush anything that might be in the RX FIFO
+        strobe(CC1101_SFRX);
+        strobe(CC1101_SFTX);
+        // start receiving
+        strobe(CC1101_SRX);
         state = STATE_IDLE_2_RX_ON;
+        call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+      }else{
+        call Leds.led2On();
+        strobe(CC1101_SIDLE);
+        state = STATE_RX_ON_2_IDLE;
+        call RadioAlarm.wait(RX_ON_2_IDLE_TIME*100); // 12 symbol periods
       }
-      else
-        cmd = CMD_SIGNAL_DONE;
     }
   }
 
@@ -702,7 +715,7 @@ implementation
     else if( cmd == CMD_TURNON && state == STATE_IDLE && isSpiAcquired() && call RadioAlarm.isFree())
     {
       // setChannel was ignored in SLEEP because the SPI was not working, so do it here
-      /*setChannel();*/
+      setChannel();
 
       // Flush anything that might be in the RX FIFO
       strobe(CC1101_SFRX);
@@ -1114,7 +1127,7 @@ implementation
     uint16_t sfdTime;
     uint8_t rxbytes;
     /*uint8_t fifo_length = getHeader(rxMsg)->length ;*/
-    
+
     sfdTime = capturedTime;
     // the last two bytes are not the fsc, but RSSI(8), CRC_ON(1)+LQI(7)
     readRssiFromRxFifo(&rssi);
@@ -1124,7 +1137,9 @@ implementation
     while(1){
       readLengthFromRxBytes(&rxbytes);
       if(rxbytes > 0){
+        call CSN.clr();
         readRxFifo(NULL, rxbytes);
+        call CSN.set();
       }else
         break;
     }
@@ -1326,6 +1341,7 @@ implementation
     }
 #endif
 
+    call Leds.led0Toggle();
     if( txEnd ) {
       // end of transmission
       if( isSpiAcquired() )
@@ -1450,6 +1466,9 @@ implementation
       call DiagMsg.send();
     }
 #endif
+    call Leds.led1Off();
+    call Leds.led1On();
+    call Leds.led1Off();
   }
 
   /*----------------- RadioPacket -----------------*/
