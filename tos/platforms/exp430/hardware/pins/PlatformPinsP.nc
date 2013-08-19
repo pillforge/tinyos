@@ -52,6 +52,9 @@ implementation {
       PMAPPWD = PMAPPW;                         // Get write-access to port mapping regs
       P4MAP0 = PM_TB0CCR1A;                      // Map Timer_B CCR1 capture/compare
       /*P4MAP6 = PM_UCA0TXD;                      // Map UCA0TXD output to P1.6*/
+      P4MAP6 = PM_TB0CCR2A;                      // Map Timer_B CCR2 capture/compare
+      P4MAP7 = PM_TB0CCR3A;                      // Map Timer_B CCR3 capture/compare
+
       PMAPPWD = 0;                              // Lock port mapping registers
 
     }

@@ -59,3 +59,13 @@ end
 document rst
 Reset and run device
 end
+
+define prog
+monitor prog $arg0
+end
+
+document prog
+Program the device with the provided elf or hex file
+end
+
+set history save
