@@ -58,6 +58,11 @@ configuration PlatformUsciMapC {
   SpiB0C.SOMI -> GIO.UCB0SOMI;
   SpiB0C.CLK  -> GIO.UCB0CLK;
 
+  components Msp430UsciSpiB1P as SpiB1C;
+  SpiB1C.SIMO -> GIO.UCB1SIMO;
+  SpiB1C.SOMI -> GIO.UCB1SOMI;
+  SpiB1C.CLK  -> GIO.UCB1CLK;
+
   /*components Msp430UsciSpiA3P as SpiA3C;*/
   /*SpiA3C.SIMO -> GIO.UCA3SIMO;*/
   /*SpiA3C.SOMI -> GIO.UCA3SOMI;*/

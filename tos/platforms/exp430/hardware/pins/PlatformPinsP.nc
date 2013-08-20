@@ -56,6 +56,9 @@ implementation {
       P4MAP7 = PM_TB0CCR3A;                      // Map Timer_B CCR3 capture/compare
 
       PMAPPWD = 0;                              // Lock port mapping registers
+      P4SEL &= 0x3f;
+      P4DIR |= 0xc0;
+      P4OUT &= 0x3f;
 
     }
     return SUCCESS;
