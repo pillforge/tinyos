@@ -1,0 +1,10 @@
+#-*-Makefile-*- vim:syntax=make
+
+PLATFORM = vumcr
+MSP_MCU = msp430f5528
+DEFAULT_PROGRAM ?= mspdebug
+
+$(call TOSMake_include_platform,msp)
+
+vumcr: $(BUILD_DEPS)
+	@:

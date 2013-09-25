@@ -452,10 +452,7 @@ configuration HplMsp430GeneralIOC {
   provides interface HplMsp430GeneralIO as ADC15;
 
 #endif /* msp430x54x || msp430x54xA */
-/*
- * x5 family: msp430f5529
- */
-#if defined(__MSP430F5529)
+#if defined(__MSP430F5528) || defined(__MSP430F5529)
   provides interface HplMsp430GeneralIO as TA0CCR0;
   provides interface HplMsp430GeneralIO as TA0CCR1;
   provides interface HplMsp430GeneralIO as TA0CCR2;
@@ -473,18 +470,18 @@ configuration HplMsp430GeneralIOC {
   provides interface HplMsp430GeneralIO as TA2CCR2;
   provides interface HplMsp430GeneralIO as TA2CLK;
 
-  provides interface HplMsp430GeneralIO as TB0CCR0;
-  provides interface HplMsp430GeneralIO as TB0CCR1;
-  provides interface HplMsp430GeneralIO as TB0CCR2;
-  provides interface HplMsp430GeneralIO as TB0CCR3;
-  provides interface HplMsp430GeneralIO as TB0CCR4;
-  provides interface HplMsp430GeneralIO as TB0CCR5;
-  provides interface HplMsp430GeneralIO as TB0CCR6;
-  provides interface HplMsp430GeneralIO as TB0CLK;
-  provides interface HplMsp430GeneralIO as TB0OUTH;
+  /*provides interface HplMsp430GeneralIO as TB0CCR0;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR1;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR2;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR3;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR4;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR5;*/
+  /*provides interface HplMsp430GeneralIO as TB0CCR6;*/
+  /*provides interface HplMsp430GeneralIO as TB0CLK;*/
+  /*provides interface HplMsp430GeneralIO as TB0OUTH;*/
 
   provides interface HplMsp430GeneralIO as RTCCLK;
-  provides interface HplMsp430GeneralIO as MCLK;
+  /*provides interface HplMsp430GeneralIO as MCLK;*/
   provides interface HplMsp430GeneralIO as SMCLK;
   provides interface HplMsp430GeneralIO as ACLK;
   /*provides interface HplMsp430GeneralIO as ADC12CLK;*/
@@ -537,17 +534,43 @@ configuration HplMsp430GeneralIOC {
 // measures AVcc through a divider network.   There are
 // no external pins associated with ADC10 or ADC11.
 
+  /*provides interface HplMsp430GeneralIO as ADC12;*/
+  /*provides interface HplMsp430GeneralIO as ADC13;*/
+  /*provides interface HplMsp430GeneralIO as ADC14;*/
+  /*provides interface HplMsp430GeneralIO as ADC15;*/
+
+  // Supply voltage monitoring
+  provides interface HplMsp430GeneralIO as SVMOUT;
+
+#endif /* MSP430F5528 or MSP430F5529 */
+/*
+ * specific to msp430f5529
+ */
+#if defined(__MSP430F5529)
+  provides interface HplMsp430GeneralIO as TB0CCR0;
+  provides interface HplMsp430GeneralIO as TB0CCR1;
+  provides interface HplMsp430GeneralIO as TB0CCR2;
+  provides interface HplMsp430GeneralIO as TB0CCR3;
+  provides interface HplMsp430GeneralIO as TB0CCR4;
+  provides interface HplMsp430GeneralIO as TB0CCR5;
+  provides interface HplMsp430GeneralIO as TB0CCR6;
+  provides interface HplMsp430GeneralIO as TB0CLK;
+  provides interface HplMsp430GeneralIO as TB0OUTH;
+
+  provides interface HplMsp430GeneralIO as MCLK;
+
+// A10 connects internally to Ref_x and A11 (INCHx = 0xB)
+// measures AVcc through a divider network.   There are
+// no external pins associated with ADC10 or ADC11.
+
   provides interface HplMsp430GeneralIO as ADC12;
   provides interface HplMsp430GeneralIO as ADC13;
   provides interface HplMsp430GeneralIO as ADC14;
   provides interface HplMsp430GeneralIO as ADC15;
 
-  // Supply voltage monitoring
-  provides interface HplMsp430GeneralIO as SVMOUT;
-
 #endif /* MSP430F5529 */
-
 }
+
 implementation {
   components 
 #if defined(__MSP430_HAS_PORT1_R__)
@@ -1192,7 +1215,7 @@ implementation {
 
 #endif	/* __msp430x54x || __msp430x54xA */
 
-#if defined(__MSP430F5529)
+#if defined(__MSP430F5528) || defined(__MSP430F5529)
 
    TA0CCR0 = P11;
    TA0CCR1 = P12;
@@ -1211,18 +1234,20 @@ implementation {
    TA2CCR2 = P25;
    TA2CLK = P22;
 
-   TB0CCR0 = P56;
-   TB0CCR1 = P57;
-   TB0CCR2 = P74;
-   TB0CCR3 = P75;
-   TB0CCR4 = P76;
-   TB0CCR5 = P35;
-   TB0CCR6 = P36;
-   TB0CLK = P77;
-   TB0OUTH = P37;
+   /*
+    *TB0CCR0 = P56;
+    *TB0CCR1 = P57;
+    *TB0CCR2 = P74;
+    *TB0CCR3 = P75;
+    *TB0CCR4 = P76;
+    *TB0CCR5 = P35;
+    *TB0CCR6 = P36;
+    *TB0CLK = P77;
+    *TB0OUTH = P37;
+    */
 
    RTCCLK = P26;
-   MCLK = P77;
+   /*MCLK = P77;*/
    SMCLK = P22;
    ACLK = P10;
    // ADC12CLK is on accessable via  the Port Mapping Controller
@@ -1270,12 +1295,35 @@ implementation {
 
    // there are no ADC's 10 and 11 according to datasheet
 
+   /*ADC12 = P70;*/
+   /*ADC13 = P71;*/
+   /*ADC14 = P72;*/
+   /*ADC15 = P73;*/
+
+   SVMOUT = P37;
+
+#endif	/* __MSP430F5528 || __MSP430F5529*/
+
+#if defined(__MSP430F5529)
+
+   TB0CCR0 = P56;
+   TB0CCR1 = P57;
+   TB0CCR2 = P74;
+   TB0CCR3 = P75;
+   TB0CCR4 = P76;
+   TB0CCR5 = P35;
+   TB0CCR6 = P36;
+   TB0CLK = P77;
+   TB0OUTH = P37;
+
+   MCLK = P77;
+
+   // there are no ADC's 10 and 11 according to datasheet
+
    ADC12 = P70;
    ADC13 = P71;
    ADC14 = P72;
    ADC15 = P73;
-
-   SVMOUT = P37;
 
 #endif	/* __MSP430F5529 */
 
