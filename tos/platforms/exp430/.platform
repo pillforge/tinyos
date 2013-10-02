@@ -3,8 +3,7 @@
 # @includes instead of -I's to @opts, otherwise the %T won't be processed
 # by ncc.
 
-for (split(/\n/, <<'EOText'
-
+push( @includes, qw(
   %P/hardware/adc
   %P/hardware/buttons
   %P/hardware/clock
@@ -66,13 +65,7 @@ for (split(/\n/, <<'EOText'
   %T/lib/printf
   %T/lib/diagmsg
 
-EOText
-)) {
-  s/\#.*$//;
-  s/^\s*//g;
-  s/\s*$//g;
-  push(@includes, $_) if $_;
-}
+) );
 
 @opts = qw(
   -gcc=msp430-gcc
