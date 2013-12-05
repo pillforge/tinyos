@@ -39,8 +39,31 @@
 #ifndef _I2C_H
 #define _I2C_H
 
+/*
+ * It would be nice to deprecate TI2CExtdAddr and TI2CBasicAddr
+ * and replace them with TI2C7Bit and TI2C10Bit.
+ *
+ * But there is way too much code that uses TI2CBasicAddr and BasicAddr
+ * and it would be a pain to fix all that.  Also adding a backward
+ * compatible interface to code providing BasicAddr is a pain because
+ * of the signalling.  More trouble than it is worth.
+ *
+ * So keep in mind that TI2CBasicAddr is really TI2C7Bit.
+ */
+
+/* nobody uses ExtdAddr (10 bit) address but define it anyway */
 typedef struct { } TI2CExtdAddr;
+
+/*
+ * BasicAddr (7 bit addresses) is used all over the place.
+ * so back filling isn't recommended.  New code should use
+ * TI2C7Bit.  But that is also problematic.  If so stick with
+ * TI2CBasicAddr.
+ */
 typedef struct { } TI2CBasicAddr;
+
+typedef struct { } TI2C7Bit;
+typedef struct { } TI2C10Bit;
 
 typedef uint8_t i2c_flags_t;
 
@@ -48,6 +71,7 @@ enum {
   I2C_START   = 0x01,
   I2C_STOP    = 0x02,
   I2C_ACK_END = 0x04,
+  I2C_RESTART = 0x08,
 };
 
 
