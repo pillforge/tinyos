@@ -543,9 +543,12 @@ implementation {
      * doesn't get interrupted. Thus, we can check the flag and read the last
      * byte, if it's available.
      */
-    if ((m_left == 1) && UCRXIFG){
-      m_left--;
-      m_buf[m_pos++] = call Usci.getRxbuf();
+    if (m_left == 1){
+      uint8_t ifg = call Usci.getIfg();
+      if (ifg & UCRXIFG){
+        m_left--;
+        m_buf[m_pos++] = call Usci.getRxbuf();
+      }
     }
 
     if (m_left == 0) {
