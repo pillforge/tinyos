@@ -215,6 +215,12 @@ implementation
 
   uint8_t configRegSize = 47;
 
+  uint8_t paRegs[] = {
+    CC1101_PA
+  };
+  uint8_t paRegSize = 1;
+
+
 
   norace uint16_t capturedTime; // time when the last GDO0 rising edge was captured
 
@@ -676,6 +682,9 @@ implementation
       call CSN.clr();
       burstWrite(0x0, configRegs, configRegSize);
       call CSN.set();
+      call CSN.clr();
+      burstWrite(CC1101_PATABLE, paRegs, paRegSize);
+      call CSN.set();
       state = STATE_IDLE;
       call Tasklet.schedule();
     }
@@ -1069,7 +1078,7 @@ implementation
 #endif
     if (fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
-      resetRx();
+      /*resetRx();*/
       return;
     }
 

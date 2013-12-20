@@ -329,8 +329,8 @@ enum cc1101_config_reg_enums {
 #define CC1101_500K  10
 
 #ifndef CC1101_BAUD
-//#define CC1101_BAUD CC1101_10K
-#define CC1101_BAUD CC1101_250K
+#define CC1101_BAUD CC1101_10K
+//#define CC1101_BAUD CC1101_250K
 #endif
 
 /**
@@ -375,6 +375,7 @@ enum cc1101_config_reg_enums {
  
  
 
+#if (CC1101_MATCHING_NETWORK == CC1101_433_MHZ)
 /***************** 433 MHz Matching Network ****************/
 
 // Default channel is at 433.191833 MHz
@@ -412,7 +413,46 @@ enum{
 #define CC1101_PA CC1101_PA_PLUS_0
 #endif
 
+#elif (CC1101_MATCHING_NETWORK == CC1101_868_MHZ)
+/***************** 868 MHz Matching Network ****************/
 
+#warning "Using 868 MHz radio"
+// Default channel is at 868.192749 MHz
+#ifndef CC1101_DEFAULT_CHANNEL
+#define CC1101_DEFAULT_CHANNEL 141
+#endif
+
+#ifndef CC1101_CHANNEL_MIN
+#define CC1101_CHANNEL_MIN 0
+#endif
+
+#ifndef CC1101_CHANNEL_MAX
+#define CC1101_CHANNEL_MAX 255
+#endif
+
+enum {
+  CC1101_LOWEST_FREQ = 839998,
+  CC1101_DEFAULT_FREQ2 = 0x20,
+  CC1101_DEFAULT_FREQ1 = 0x4E,
+  CC1101_DEFAULT_FREQ0 = 0xC4,
+};
+
+/**
+ * These values calculated using TI smart RF studio
+ */
+enum{
+  CC1101_PA_PLUS_10 = 0xC3,
+  CC1101_PA_PLUS_5 = 0x85,
+  CC1101_PA_PLUS_0 = 0x8E,
+  CC1101_PA_MINUS_5 = 0x57,
+  CC1101_PA_MINUS_10 = 0x34,
+};
+
+#ifndef CC1101_PA
+#define CC1101_PA CC1101_PA_PLUS_10
+#endif
+
+#endif
 /**
  * These are used for calculating channels at runtime
  */
