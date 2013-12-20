@@ -1,15 +1,15 @@
 
-set remoteaddresssize 0d64
+#set remoteaddresssize 0d64
 set remotetimeout 0d999999
-set remote memory-write-packet-size 1024
-set remote memory-write-packet-size fixed
+#set remote memory-write-packet-size 1024
+#set remote memory-write-packet-size fixed
 set remote memory-read-packet-size 1024
 set remote memory-read-packet-size fixed
 
 
 #source ../../.gdb_x1
  #source ../../.gdb_x2
-source ../../.gdb_x5
+source ./.gdb_x5
 
 target remote localhost:2000
 
@@ -53,9 +53,30 @@ end
 
 define rst
 monitor reset
+flushregs
 c
 end
 
 document rst
 Reset and run device
+end
+
+define flash
+erase
+load
+end
+
+document flash
+Erase, load device
+end
+
+define flash_run
+erase
+load
+monitor reset
+flushregs
+end
+
+document flash_run
+Erase, load and reset device
 end
