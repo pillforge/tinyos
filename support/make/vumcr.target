@@ -3,6 +3,7 @@
 PLATFORM = vumcr
 MSP_MCU = msp430f5528
 DEFAULT_PROGRAM ?= mspdebug
+MSP_DEBUG_FLAGS ?= tilib
 
 $(call TOSMake_include_platform,msp)
 

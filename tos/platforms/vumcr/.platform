@@ -7,16 +7,17 @@ push( @includes, qw(
 
   %P/hardware/pins
   %P/hardware/leds
+  %T/hardware/usci
   %T/platforms/exp430/
   %T/platforms/exp430/hardware/adc
   %T/platforms/exp430/hardware/buttons
   %T/platforms/exp430/hardware/clock
-  %T/platforms/exp430/hardware/usci
   %T/platforms/exp430/chips/ccxx00
   %T/chips/msp430/x5xxx
   %T/chips/msp430/x5xxx/lpm
   %T/chips/msp430/x5xxx/timer
   %T/chips/msp430/x5xxx/usci-v2
+  %T/chips/msp430/x5xxx/usci-v2/i2c-sm
   %T/chips/msp430
   %T/chips/msp430/pins
   %T/chips/msp430/timer
