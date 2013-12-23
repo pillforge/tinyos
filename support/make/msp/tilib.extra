@@ -1,0 +1,4 @@
+#-*-Makefile-*- vim:ft=make
+# mspdebug using the tilib driver
+
+MSP_DEBUG_FLAGS = tilib
