@@ -460,7 +460,7 @@ module PlatformClockP {
     UCSCTL5 = DIVA__1 | DIVS__1 | DIVM__1;
 
     /*
-     * TA0 clocked off XT1, used for TMilli, 32KiHz.
+     * TA0 clocked off XT1, used for PWM
      */
     TA0CTL = TASSEL__ACLK | TACLR | MC__CONTINOUS | TAIE;
     TA0R = 0;
@@ -470,6 +470,12 @@ module PlatformClockP {
      */
     TA1CTL = TASSEL__SMCLK | ID__8 | TACLR | MC__CONTINOUS | TAIE;
     TA1R = 0;
+
+    /*
+     * TA2 clocked off XT1, used for TMilli, 32KiHz.
+     */
+    TA2CTL = TASSEL__ACLK | TACLR | MC__CONTINOUS | TAIE;
+    TA2R = 0;
 
     return SUCCESS;
   }

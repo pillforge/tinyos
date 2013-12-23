@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2010 People Power Co.
+ * Copyright (c) 2011, Eric B. Decker
+ * Copyright (c) 2010, People Power Co.
+ * Copyright (c) 2000-2003 The Regents of the University of California.
  * All rights reserved.
- *
- * This open source code was developed with funding from People Power Company
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,42 +34,28 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-configuration PlatformAdcC {
-  provides {
-    interface HplMsp430GeneralIO as A0;
-    interface HplMsp430GeneralIO as A1;
-    interface HplMsp430GeneralIO as A2;
-    interface HplMsp430GeneralIO as A3;
-    interface HplMsp430GeneralIO as A4;
-    interface HplMsp430GeneralIO as A5;
-    interface HplMsp430GeneralIO as A6;
-    interface HplMsp430GeneralIO as A7;
+/**
+ * Msp430Counter32khC provides the standard 32khz counter for the MSP430.
+ *
+ * @author Cory Sharp <cssharp@eecs.berkeley.edu>
+ * @author Peter A. Bigot <pab@peoplepowerco.com>
+ * @author Eric B. Decker <cire831@gmail.com>
+ *
+ * @see  Please refer to TEP 102 for more information about this component and its
+ *          intended use.
+ *
+ * The cc430f5137 and the msp430f5138{,a} (both x5 family) have at a minimum the
+ * T0A5 and T1A3 timer h/w.  We assign T0A to the 32KiHz timer and T1A to the
+ * 1 MiHz (TMicro) timer (see Msp430CounterMicro).
+ */
 
-    interface Msp430Timer as TimerB;
-    interface Msp430TimerControl as ControlB0;
-    interface Msp430TimerControl as ControlB1;
-    interface Msp430Compare as CompareB0;
-    interface Msp430Compare as CompareB1;
-  }
+configuration Msp430Counter32khzC {
+  provides interface Counter<T32khz,uint16_t> as Msp430Counter32khz;
 }
-
 implementation {
-
-  components HplMsp430GeneralIOC;
-  A0 = HplMsp430GeneralIOC.ADC0;
-  A1 = HplMsp430GeneralIOC.ADC1;
-  A2 = HplMsp430GeneralIOC.ADC2;
-  A3 = HplMsp430GeneralIOC.ADC3;
-  A4 = HplMsp430GeneralIOC.ADC4;
-  A5 = HplMsp430GeneralIOC.ADC5;
-  A6 = HplMsp430GeneralIOC.ADC6;
-  A7 = HplMsp430GeneralIOC.ADC7;
-
   components Msp430TimerC;
-  TimerB = Msp430TimerC.Timer0_B;
-  ControlB0 = Msp430TimerC.Control0_B0;
-  ControlB1 = Msp430TimerC.Control0_B1;
-  CompareB0 = Msp430TimerC.Compare0_B0;
-  CompareB1 = Msp430TimerC.Compare0_B1;
+  components new Msp430CounterC(T32khz) as Counter;
 
+  Msp430Counter32khz = Counter;
+  Counter.Msp430Timer -> Msp430TimerC.Timer2_A;
 }
