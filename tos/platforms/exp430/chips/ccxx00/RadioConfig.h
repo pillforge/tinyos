@@ -69,8 +69,4 @@ typedef uint16_t tradio_size;
 #define SOFTWAREACK_TIMEOUT 2000
 #endif
 
-#ifndef CC1101_BAUD
-#define CC1101_BAUD CC1101_500K
-#endif
-
 #endif

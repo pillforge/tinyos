@@ -151,6 +151,9 @@ implementation
   // flag: end of TX event (falling GDO0 edge) was captured, but not yet processed
   norace bool txEnd = 0;
 
+  // flag: TX event was never received, for some unknown reason. Should go ahead and reset the chip
+  norace bool txFailed = FALSE;
+
   tasklet_norace uint8_t txPower;
   tasklet_norace uint8_t channel;
 
@@ -226,6 +229,7 @@ implementation
 
   inline cc1101_status_t getStatus();
   inline cc1101_status_t enableReceiveGdo();
+  inline cc1101_status_t burstRead(uint8_t addr,uint8_t* data, uint8_t length);
 
   /*----------------- ALARM -----------------*/
   tasklet_async event void RadioAlarm.fired()
@@ -262,7 +266,15 @@ implementation
       } else {
         call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
       }
-    } else
+    } else if(state == STATE_BUSY_TX_2_RX_ON){
+      // If GDO has asserted about sync byte being sent, we TX was successful, and txEnd should be set
+      if(!txEnd){
+        // TX was unsuccessful
+        call Leds.led4On();
+        txFailed = TRUE;
+      }
+    }
+    else
       RADIO_ASSERT(FALSE);
 
     // make sure the rest of the command processing is called
@@ -322,6 +334,18 @@ implementation
     call CSN.set();
 
     status.value = value1;
+    return status;
+  }
+
+
+  inline cc1101_status_t getPacketStatus(){
+    cc1101_status_t status;
+    call CSN.set(); // set CSN, just in clase it's not set
+    call CSN.clr(); // clear CSN, starting a multi-byte SPI command
+
+    // For debugging using Logic Analyzer
+    burstRead(CC1101_PKTSTATUS, &status.value, 1);
+    call CSN.set(); // set CSN, just in clase it's not set
     return status;
   }
 
@@ -401,7 +425,8 @@ implementation
     RADIO_ASSERT(status.chip_rdyn == 0);
     RADIO_ASSERT(status.state == CC1101_STATE_RX);
 
-    *lengthPtr = length1;
+    if(lengthPtr)
+      *lengthPtr = length1;
 
     return status;
   }
@@ -450,6 +475,7 @@ implementation
     do {
       status = getStatus();
       counter++;
+      getPacketStatus();
     }while(status.state != st && counter < timeout);
     return status;
   }
@@ -538,7 +564,7 @@ implementation
   }
 
   inline void resetRx(){
-    call Leds.led0On();
+    call Leds.led3On();
     call CSN.set();
     call CSN.clr();
     /*strobe(CC1101_SRES);*/
@@ -549,7 +575,7 @@ implementation
     waitForState(CC1101_STATE_RX, 0xff);
     state = STATE_RX_ON;
     cmd = CMD_NONE;
-    call Leds.led0Off();
+    /*call Leds.led3Off();*/
   }
 
 
@@ -810,6 +836,7 @@ implementation
     /*uint8_t p;*/
     uint8_t length;
     uint8_t* data;
+    /*uint16_t trials = 0;*/
     /*
      *uint8_t header;
      *uint32_t time32;
@@ -821,7 +848,7 @@ implementation
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
-    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd )
+    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd || ! call RadioAlarm.isFree())
       return EBUSY;
 
     status = getStatus();
@@ -864,7 +891,9 @@ implementation
       /*time = call RadioAlarm.getNow();*/
 
       cmd = CMD_TRANSMIT;
+      call RadioAlarm.wait(TX_2_RX_TIME); // 32+16 symbol periods
       state = STATE_BUSY_TX_2_RX_ON;
+      enableTransmitGdo();
 #ifdef RADIO_DEBUG
       sfd3 = call GDO0.get();
 #endif
@@ -873,14 +902,20 @@ implementation
       sfd4 = call GDO0.get();
 #endif
     }
-    status = waitForState(CC1101_STATE_RX, 0xff);
-    if(status.state == CC1101_STATE_RX)
-      txEnd = TRUE;
-    else {
-      // Transmission has failed
-      resetRx();
-      return EBUSY;
-    }
+    /*
+     *while(TRUE){
+     *  status = waitForState(CC1101_STATE_RX, 0xff);
+     *  if(status.state == CC1101_STATE_RX){
+     *    txEnd = TRUE;
+     *    break;
+     *  }
+     *  if(trials++ > 20){
+     *    // Transmission has failed
+     *    resetRx();
+     *    return EBUSY;
+     *  }
+     *}
+     */
     /*enableTransmitGdo();*/
 
 #ifdef RADIO_DEBUG
@@ -1079,6 +1114,24 @@ implementation
     if (fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) {
       // bad length: bail out
       /*resetRx();*/
+      if(fifo_length < 3)
+        call Leds.led3Toggle();
+      else
+        call Leds.led4Toggle();
+
+      // empty the buffer so it will be ready for the next data
+      readPayloadFromRxFifo(NULL, fifo_length+2); // +2 for RSSI and CRC
+      call CSN.set();
+      state = STATE_RX_ON;
+      cmd = CMD_NONE;
+
+      // ready to receive new message: enable GDO0 interrupts
+      // If RX FIFO overflowed, we have to flush it before we enable interrupts
+      if(status.state == CC1101_STATE_RXFIFO_OVERFLOW){
+        // flush rx fifo
+        flushRxFifo();
+      }
+      enableReceiveGdo();
       return;
     }
 
@@ -1211,6 +1264,7 @@ implementation
 
   /*----------------- IRQ -----------------*/
 
+
   // RX GDO0 (rising edge) or end of TX (falling edge)
   async event void Gdo0Capture.captured( uint16_t time )
   {
@@ -1218,6 +1272,7 @@ implementation
     call Gdo0Capture.disable();
     call Leds.led2Off();
     call Leds.led2On();
+    call Leds.led5On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
 
@@ -1238,6 +1293,8 @@ implementation
       }
     }else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON){
         txEnd = TRUE;
+        if(state == STATE_BUSY_TX_2_RX_ON)
+          call RadioAlarm.cancel(); // No need to wait for the timeout alarm
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1263,6 +1320,7 @@ implementation
     call Tasklet.schedule();
     call Leds.led2On();
     call Leds.led2Off();
+    call Leds.led5Off();
   }
 
 
@@ -1285,6 +1343,7 @@ implementation
 
   tasklet_async event void Tasklet.run()
   {
+    uint8_t left_over;
 #ifdef RADIO_DEBUG_TASKLET
     if( call DiagMsg.record() )
     {
@@ -1352,6 +1411,22 @@ implementation
         RADIO_ASSERT(FALSE);
     }
 
+    if(txFailed){
+      if( isSpiAcquired() ) {
+
+        txFailed = FALSE;
+
+        RADIO_ASSERT(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON);
+        RADIO_ASSERT(cmd == CMD_TRANSMIT);
+
+        resetRx();
+        // a packet might have been received since the end of the transmission
+        enableReceiveGdo();
+
+      } else
+        RADIO_ASSERT(FALSE);
+    }
+
     if( rxGdo0 ) {
       // incoming packet
       if( isSpiAcquired() )
@@ -1380,6 +1455,11 @@ implementation
         RADIO_ASSERT(state == STATE_RX_ON);
         /*do{*/
           downloadMessage();
+          // Debug, check status again
+          readLengthFromRxBytes(&left_over);
+          /*if (left_over != 0)*/
+          /*  P2OUT |= 0x2; // Port2.1*/
+
         /*}while(call GDO0.get());*/
       }
       else if (cmd == CMD_RX_FLUSH){

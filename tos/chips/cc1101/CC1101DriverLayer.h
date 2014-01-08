@@ -55,6 +55,12 @@ enum cc1101_timing_enums {
     TX_SFD_DELAY = STROBE_TO_TX_ON_TIME + 10 * CC1101_SYMBOL_TIME - 25,
     // TX SFD is captured in hardware
     RX_SFD_DELAY = 0,
+
+    // TX_2_RX Time is the amount of time it takes for the CC1101 to send the preamble and sync word.
+    // Since these are configurable, it is difficult to calculate exactly what this should be. For now
+    // we just assume the worst case for 2.4Kbps with 32 bit preamble and 16 bits sync word. Experiments
+    // show values > 50ms.
+    TX_2_RX_TIME = 65000U,
 };
 
 enum cc1101_reg_access_enums {
@@ -329,8 +335,9 @@ enum cc1101_config_reg_enums {
 #define CC1101_500K  10
 
 #ifndef CC1101_BAUD
-#define CC1101_BAUD CC1101_10K
+//#define CC1101_BAUD CC1101_2_4K
 //#define CC1101_BAUD CC1101_250K
+#define CC1101_BAUD CC1101_10K
 #endif
 
 /**
@@ -410,9 +417,10 @@ enum{
 };
 
 #ifndef CC1101_PA
-#define CC1101_PA CC1101_PA_PLUS_0
+//#define CC1101_PA CC1101_PA_PLUS_0
+#define CC1101_PA CC1101_PA_MINUS_10
 #endif
-
+// End CC1101_433_MHz
 #elif (CC1101_MATCHING_NETWORK == CC1101_868_MHZ)
 /***************** 868 MHz Matching Network ****************/
 
@@ -449,10 +457,10 @@ enum{
 };
 
 #ifndef CC1101_PA
-#define CC1101_PA CC1101_PA_PLUS_10
+#define CC1101_PA CC1101_PA_PLUS_0
 #endif
 
-#endif
+#endif // End CC1101_868_MHz
 /**
  * These are used for calculating channels at runtime
  */
