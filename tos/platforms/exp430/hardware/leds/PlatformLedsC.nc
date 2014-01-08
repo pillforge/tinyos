@@ -64,4 +64,25 @@ implementation {
   components new Msp430GpioC() as Led2Impl;
   Led2Impl -> GeneralIOC.Port82;
   PlatformLedsP.Led2 -> Led2Impl;
+
+  components new Msp430GpioC() as Led3Impl;
+  Led3Impl -> GeneralIOC.Port11;
+  PlatformLedsP.Led3 -> Led3Impl;
+  
+  components new Msp430GpioC() as Led4Impl;
+  Led4Impl -> GeneralIOC.Port12;
+  PlatformLedsP.Led4 -> Led4Impl;
+  
+  components new Msp430GpioC() as Led5Impl;
+  Led5Impl -> GeneralIOC.Port13;
+  PlatformLedsP.Led5 -> Led5Impl;
+  
+  components new Msp430GpioC() as Led6Impl;
+  Led6Impl -> GeneralIOC.Port14;
+  PlatformLedsP.Led6 -> Led6Impl;
+  
+  components new Msp430GpioC() as Led7Impl;
+  Led7Impl -> GeneralIOC.Port15;
+  PlatformLedsP.Led7 -> Led7Impl;
+  
 }

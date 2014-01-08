@@ -52,6 +52,11 @@ module PlatformLedsP {
     interface GeneralIO as Led0;
     interface GeneralIO as Led1;
     interface GeneralIO as Led2;
+    interface GeneralIO as Led3;
+    interface GeneralIO as Led4;
+    interface GeneralIO as Led5;
+    interface GeneralIO as Led6;
+    interface GeneralIO as Led7;
   }
 }
 
@@ -63,9 +68,19 @@ implementation {
       call Led0.makeOutput();
       call Led1.makeOutput();
       call Led2.makeOutput();
+      call Led3.makeOutput();
+      call Led4.makeOutput();
+      call Led5.makeOutput();
+      call Led6.makeOutput();
+      call Led7.makeOutput();
       call Led0.clr();
       call Led1.clr();
       call Led2.clr();
+      call Led3.clr();
+      call Led4.clr();
+      call Led5.clr();
+      call Led6.clr();
+      call Led7.clr();
     }
     return SUCCESS;
   }
@@ -106,6 +121,70 @@ implementation {
   async command void Leds.led2Toggle() {
     call Led2.toggle();
   }
+  
+  async command void Leds.led3On() {
+    call Led3.set();
+  }
+  
+  async command void Leds.led3Off() {
+    call Led3.clr();
+  }
+  
+  async command void Leds.led3Toggle() {
+    call Led3.toggle();
+  } 
+  
+  
+  async command void Leds.led4On() {
+    call Led4.set();
+  }
+  
+  async command void Leds.led4Off() {
+    call Led4.clr();
+  }
+  
+  async command void Leds.led4Toggle() {
+    call Led4.toggle();
+  }
+
+  
+  async command void Leds.led5On() {
+    call Led5.set();
+  }
+  
+  async command void Leds.led5Off() {
+    call Led5.clr();
+  }
+  
+  async command void Leds.led5Toggle() {
+    call Led5.toggle();
+  }
+
+  
+  async command void Leds.led6On() {
+    call Led6.set();
+  }
+  
+  async command void Leds.led6Off() {
+    call Led6.clr();
+  }
+  
+  async command void Leds.led6Toggle() {
+    call Led6.toggle();
+  }
+
+  
+  async command void Leds.led7On() {
+    call Led7.set();
+  }
+  
+  async command void Leds.led7Off() {
+    call Led7.clr();
+  }
+  
+  async command void Leds.led7Toggle() {
+    call Led7.toggle();
+  }
 
   async command uint8_t Leds.get() {
     uint8_t rval;
@@ -119,6 +198,21 @@ implementation {
       }
       if (call Led2.get()) {
         rval |= LEDS_LED2;
+      }
+      if (call Led3.get()) {
+        rval |= LEDS_LED3;
+      }
+      if (call Led4.get()) {
+        rval |= LEDS_LED4;
+      }
+      if (call Led5.get()) {
+        rval |= LEDS_LED5;
+      }
+      if (call Led6.get()) {
+        rval |= LEDS_LED6;
+      }
+      if (call Led7.get()) {
+        rval |= LEDS_LED7;
       }
     }
     return rval;
@@ -140,6 +234,31 @@ implementation {
         call Leds.led2On();
       } else {
         call Leds.led2Off();
+      }
+      if (val & LEDS_LED3) {
+        call Leds.led3On();
+      } else {
+        call Leds.led3Off();
+      }
+      if (val & LEDS_LED4) {
+        call Leds.led4On();
+      } else {
+        call Leds.led4Off();
+      }
+      if (val & LEDS_LED5) {
+        call Leds.led5On();
+      } else {
+        call Leds.led5Off();
+      }
+      if (val & LEDS_LED6) {
+        call Leds.led6On();
+      } else {
+        call Leds.led6Off();
+      }
+      if (val & LEDS_LED7) {
+        call Leds.led7On();
+      } else {
+        call Leds.led7Off();
       }
     }
   }
