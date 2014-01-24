@@ -295,11 +295,15 @@ module PlatformClockP {
      *
      * Surf found XCAP=0 worked nice.  We do the same thing but it should
      * be checked.   FIXME. 
-     * The EXP430 has 12pF caps on the crystal so we should use XCAP_0
+     * 
+     * For the VUMCR, we will only use the internal capacitance settings of
+     * the MSP430. This will reduce our component count.
      */
 
+
     P5SEL |= (BIT4 | BIT5);
-    UCSCTL6 &= ~(XT1OFF | XCAP_3);
+    UCSCTL6 &= ~XT1OFF;
+    UCSCTL6 |= XCAP_3;
 
     /*
      * From comments in Surf code.

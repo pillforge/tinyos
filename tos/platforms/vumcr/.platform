@@ -7,10 +7,10 @@ push( @includes, qw(
   %P/hardware/pins
   %P/hardware/leds
   %P/hardware/usci
+  %P/hardware/clock
   %T/platforms/exp430/
   %T/platforms/exp430/hardware/adc
   %T/platforms/exp430/hardware/buttons
-  %T/platforms/exp430/hardware/clock
   %T/platforms/exp430/hardware/timer
   %T/platforms/exp430/chips/ccxx00
   %T/chips/msp430/x5xxx
