@@ -336,8 +336,10 @@ enum cc1101_config_reg_enums {
 
 #ifndef CC1101_BAUD
 //#define CC1101_BAUD CC1101_2_4K
-//#define CC1101_BAUD CC1101_250K
-#define CC1101_BAUD CC1101_10K
+//#define CC1101_BAUD CC1101_10K
+//#define CC1101_BAUD CC1101_100K
+#define CC1101_BAUD CC1101_250K
+//#define CC1101_BAUD CC1101_500K
 #endif
 
 /**

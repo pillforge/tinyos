@@ -412,14 +412,19 @@ implementation
 
     // For debugging using Logic Analyzer
     burstRead(CC1101_PKTSTATUS, &pkt_status, 1);
+    call CSN.set();
 
     /*status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE | CC1101_RXBYTES);*/
     /**lengthPtr = call SpiByte.write(0);*/
 
+    call CSN.clr();
     status = burstRead(CC1101_RXBYTES, &length1, 1);
+    call CSN.set();
     do {
       length2 = length1;
+      call CSN.clr();
       status = burstRead(CC1101_RXBYTES, &length1, 1);
+      call CSN.set();
     }while(length1 != length2);
 
     RADIO_ASSERT(status.chip_rdyn == 0);
@@ -446,6 +451,8 @@ implementation
   {
     // readLengthFromRxFifo was called before, so CSN is cleared and spi is ours
     RADIO_ASSERT( call CSN.get() == 0 );
+    // Also, this assumes that the CC1101_RXFIFO address has already been sent to the CC1101. If this gets called
+    // without setting this address, the data will be filled with the status byte, not data from the FIFO.
 
     call SpiBlock.transfer(NULL, data, length);
   }
@@ -564,7 +571,7 @@ implementation
   }
 
   inline void resetRx(){
-    call Leds.led3On();
+    call Leds.led6On();
     call CSN.set();
     call CSN.clr();
     /*strobe(CC1101_SRES);*/
@@ -575,7 +582,6 @@ implementation
     waitForState(CC1101_STATE_RX, 0xff);
     state = STATE_RX_ON;
     cmd = CMD_NONE;
-    /*call Leds.led3Off();*/
   }
 
 
@@ -853,11 +859,12 @@ implementation
 
     status = getStatus();
     if (status.state == CC1101_STATE_TXFIFO_UNDERFLOW){
-      RADIO_ASSERT(FALSE);
       // flush tx fifo
       strobe(CC1101_SFTX);
       return EBUSY;
-    }
+    } else if(status.state == CC1101_STATE_CALIBRATE || status.state == CC1101_STATE_SETTLING)
+      return EBUSY;
+
     // start transmission
     status = strobe(CC1101_STX);
 
@@ -867,6 +874,13 @@ implementation
     // right number of bytes to the TXFIFO
     length = call RadioPacket.payloadLength(msg) + 1;
 
+    status = waitForState(CC1101_STATE_TX, 0xff);
+    if (status.state != CC1101_STATE_TX){
+      call Leds.led3On();
+      call Leds.led3Off();
+      /*resetRx();*/
+      return EBUSY;
+    }
     // Fill up the FIFO
     call CSN.set();
     call CSN.clr();
@@ -874,11 +888,11 @@ implementation
     call CSN.set();
 
     // Check if in TX mode. If not in TX mode, CCA has failed
-    status = getStatus();
-    if (status.state != CC1101_STATE_TX){
-      resetRx();
-      return EBUSY;
-    }
+    /*status = getStatus();*/
+    /*if (status.state != CC1101_STATE_TX){*/
+      /*resetRx();*/
+      /*return EBUSY;*/
+    /*}*/
 
     atomic {
 #ifdef RADIO_DEBUG
@@ -1076,7 +1090,8 @@ implementation
 
   inline void downloadMessage()
   {
-    uint8_t fifo_length;
+    uint8_t fifo_length, fifo_length_end;
+    uint8_t packet_length;
     uint16_t crc = 1;
     uint8_t* data;
     uint8_t rssi;
@@ -1095,7 +1110,8 @@ implementation
     data = getPayload(rxMsg) + sizeof(cc1101_header_t);
 
     // read the length of bytes in the RX FIFO
-    status = readLengthFromRxFifo(&fifo_length);
+    /*status = readLengthFromRxFifo(&fifo_length);*/
+    status = readLengthFromRxBytes(&fifo_length);
 
 #ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
@@ -1111,40 +1127,62 @@ implementation
       call DiagMsg.send();
     }
 #endif
-    if (fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) {
-      // bad length: bail out
-      /*resetRx();*/
-      if(fifo_length < 3)
-        call Leds.led3Toggle();
-      else
-        call Leds.led4Toggle();
+    // TODO: Handle RX FIFO overflow
+    // If RX FIFO overflowed, we have to flush it before we enable interrupts
+    if(status.state == CC1101_STATE_RXFIFO_OVERFLOW){
+      // flush rx fifo
+      flushRxFifo();
+      enableReceiveGdo();
+      return;
+    }
 
-      // empty the buffer so it will be ready for the next data
-      readPayloadFromRxFifo(NULL, fifo_length+2); // +2 for RSSI and CRC
+    if(fifo_length == 0){
+      // This is a discarded packet. Nothing to do...enable interrupts and reset state vars.
       call CSN.set();
       state = STATE_RX_ON;
       cmd = CMD_NONE;
 
       // ready to receive new message: enable GDO0 interrupts
-      // If RX FIFO overflowed, we have to flush it before we enable interrupts
-      if(status.state == CC1101_STATE_RXFIFO_OVERFLOW){
-        // flush rx fifo
-        flushRxFifo();
-      }
+      enableReceiveGdo();
+      return;
+    }
+
+    // Read the packet size from the first byte in the buffer
+    status = readLengthFromRxFifo(&packet_length);
+
+    if ((fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) 
+        ||(packet_length < 3 || packet_length > call RadioPacket.maxPayloadLength() + 2 )) {
+      // bad length: bail out. Not sure how likely this is since when packet length filter is enabled.
+      /*resetRx();*/
+      /*
+       *if(fifo_length < 3)
+       *  call Leds.led3Toggle();
+       *else
+       *  call Leds.led4Toggle();
+       */
+
+      call Leds.led3On();
+      call Leds.led3Off();
+      // empty the buffer so it will be ready for the next data
+      //readRxFifo(NULL, fifo_length-2); // Uncomment if the packet length is NOT read before the if block
+      readPayloadFromRxFifo(NULL, fifo_length-1 );
+      call CSN.set();
+      state = STATE_RX_ON;
+      cmd = CMD_NONE;
+
+      // ready to receive new message: enable GDO0 interrupts
       enableReceiveGdo();
       return;
     }
 
     // if we're here, length must be correct
     RADIO_ASSERT(fifo_length >= 3 && fifo_length <= call RadioPacket.maxPayloadLength() + 2);
+    RADIO_ASSERT(packet_length >= 3 && packet_length <= call RadioPacket.maxPayloadLength() + 2);
 
     // The length does not include the length byte
-    getHeader(rxMsg)->length = fifo_length;
+    getHeader(rxMsg)->length = packet_length;
 
-    // TODO: The payload contains the length byte, thus setting the length byte in the previous line of code is useless.
-    // Investigate if we should consider the length byte as part of the payload or not.
-    // download the whole payload
-    readPayloadFromRxFifo(data, fifo_length );
+    readPayloadFromRxFifo(data, packet_length );
 
     // the last two bytes are not the fsc, but RSSI(8), CRC_ON(1)+LQI(7)
     readRssiFromRxFifo(&rssi);
@@ -1164,11 +1202,23 @@ implementation
     }
      */
 
+    // There might be more packets in the FIFO if we have received multiple packets
+    status = readLengthFromRxBytes(&fifo_length_end);
+
+    if (fifo_length_end != 0){
+      // What to do with these packets is not clear. We can completely discard them or read them in and signal multiple
+      // receive events.
+      call Leds.led3On();
+      call Leds.led3Off();
+      strobe(CC1101_SIDLE);
+      waitForState(CC1101_STATE_IDLE, 0xff);
+      flushRxFifo();
+    }
+
     state = STATE_RX_ON;
     cmd = CMD_NONE;
 
     // ready to receive new message: enable GDO0 interrupts
-    // If RX FIFO overflowed, we have to flush it before we enable interrupts
     if(status.state != CC1101_STATE_RXFIFO_OVERFLOW)
       enableReceiveGdo();
 
@@ -1251,12 +1301,9 @@ implementation
       rxMsg = signal RadioReceive.receive(rxMsg);
 
 
-    }
-    // TODO: Handle RX FIFO overflow
-    if(status.state == CC1101_STATE_RXFIFO_OVERFLOW){
-      // flush rx fifo
-      flushRxFifo();
-      enableReceiveGdo();
+    }else{
+      call Leds.led4On();
+      call Leds.led4Off();
     }
 
   }
