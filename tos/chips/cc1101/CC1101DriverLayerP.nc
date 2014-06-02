@@ -270,7 +270,6 @@ implementation
       // If GDO has asserted about sync byte being sent, we TX was successful, and txEnd should be set
       if(!txEnd){
         // TX was unsuccessful
-        call Leds.led4On();
         txFailed = TRUE;
       }
     }
@@ -505,7 +504,7 @@ implementation
 
     // set pin directions
     call CSN.makeOutput();
-    call GDO0.makeInput();
+    /*call GDO0.makeInput();*/
     call GDO2.makeInput(); // CHIP_RDYn by default
 
     call Gdo0Capture.disable();
@@ -571,7 +570,6 @@ implementation
   }
 
   inline void resetRx(){
-    call Leds.led6On();
     call CSN.set();
     call CSN.clr();
     /*strobe(CC1101_SRES);*/
@@ -832,13 +830,16 @@ implementation
     cc1101_status_t status;
     atomic {
       // Finished sending message
+      // Enable LEDs to debug gdo
+      /*call Leds.led3On();*/
       call Gdo0Capture.captureFallingEdge();
+      /*call Leds.led3Off();*/
     }
     return status;
   }
   tasklet_async command error_t RadioSend.send(message_t* msg)
   {
-    /*uint16_t time;*/
+    uint16_t time;
     /*uint8_t p;*/
     uint8_t length;
     uint8_t* data;
@@ -854,6 +855,22 @@ implementation
 #ifdef RADIO_DEBUG
     uint8_t sfd1, sfd2, sfd3, sfd4;
 #endif
+#ifdef RADIO_DEBUG_MESSAGES
+
+    if( call DiagMsg.record() )
+    {
+      length = call RadioPacket.payloadLength(msg) + 1;
+
+      call DiagMsg.str("bt");
+      call DiagMsg.uint8(cmd);
+      call DiagMsg.uint8(state);
+      call DiagMsg.uint8(rxGdo0);
+      call DiagMsg.uint8(txEnd);
+      call DiagMsg.uint8(call RadioAlarm.isFree());
+      call DiagMsg.send();
+    }
+#endif
+
     if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd || ! call RadioAlarm.isFree())
       return EBUSY;
 
@@ -868,19 +885,22 @@ implementation
     // start transmission
     status = strobe(CC1101_STX);
 
-    // Do other useful things while we wait for TX state
-    data = getPayload(msg);
     // The length byte does not count itself so add one here in order to send the
     // right number of bytes to the TXFIFO
     length = call RadioPacket.payloadLength(msg) + 1;
 
     status = waitForState(CC1101_STATE_TX, 0xff);
     if (status.state != CC1101_STATE_TX){
-      call Leds.led3On();
-      call Leds.led3Off();
       /*resetRx();*/
       return EBUSY;
     }
+    // get a timestamp right after strobe returns
+    // This may not be accurate enough for time sync.
+    time = call RadioAlarm.getNow();
+    call PacketTimeStamp.set(msg, time);
+
+    // Do other useful things while we wait for TX state
+    data = getPayload(msg);
     // Fill up the FIFO
     call CSN.set();
     call CSN.clr();
@@ -901,8 +921,6 @@ implementation
 #ifdef RADIO_DEBUG
       sfd2 = call GDO0.get();
 #endif
-      // get a timestamp right after strobe returns
-      /*time = call RadioAlarm.getNow();*/
 
       cmd = CMD_TRANSMIT;
       call RadioAlarm.wait(TX_2_RX_TIME); // 32+16 symbol periods
@@ -1153,16 +1171,6 @@ implementation
     if ((fifo_length < 3 || fifo_length > call RadioPacket.maxPayloadLength() + 2 ) 
         ||(packet_length < 3 || packet_length > call RadioPacket.maxPayloadLength() + 2 )) {
       // bad length: bail out. Not sure how likely this is since when packet length filter is enabled.
-      /*resetRx();*/
-      /*
-       *if(fifo_length < 3)
-       *  call Leds.led3Toggle();
-       *else
-       *  call Leds.led4Toggle();
-       */
-
-      call Leds.led3On();
-      call Leds.led3Off();
       // empty the buffer so it will be ready for the next data
       //readRxFifo(NULL, fifo_length-2); // Uncomment if the packet length is NOT read before the if block
       readPayloadFromRxFifo(NULL, fifo_length-1 );
@@ -1208,8 +1216,6 @@ implementation
     if (fifo_length_end != 0){
       // What to do with these packets is not clear. We can completely discard them or read them in and signal multiple
       // receive events.
-      call Leds.led3On();
-      call Leds.led3Off();
       strobe(CC1101_SIDLE);
       waitForState(CC1101_STATE_IDLE, 0xff);
       flushRxFifo();
@@ -1301,11 +1307,7 @@ implementation
       rxMsg = signal RadioReceive.receive(rxMsg);
 
 
-    }else{
-      call Leds.led4On();
-      call Leds.led4Off();
     }
-
   }
 
 
@@ -1319,7 +1321,6 @@ implementation
     call Gdo0Capture.disable();
     call Leds.led2Off();
     call Leds.led2On();
-    call Leds.led5On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
     RADIO_ASSERT( ! txEnd ); // assert that there's no nesting
 
@@ -1367,7 +1368,6 @@ implementation
     call Tasklet.schedule();
     call Leds.led2On();
     call Leds.led2Off();
-    call Leds.led5Off();
   }
 
 
@@ -1503,7 +1503,7 @@ implementation
         /*do{*/
           downloadMessage();
           // Debug, check status again
-          readLengthFromRxBytes(&left_over);
+          /*readLengthFromRxBytes(&left_over);*/
           /*if (left_over != 0)*/
           /*  P2OUT |= 0x2; // Port2.1*/
 

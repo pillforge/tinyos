@@ -90,89 +90,6 @@ enum cc1101_status_state { // Comments from datasheet
     CC1101_STATE_RXFIFO_OVERFLOW  = 6, // RX FIFO has overflowed. Read out any useful data, then flush the FIFO with SFRX
     CC1101_STATE_TXFIFO_UNDERFLOW = 7  // TX FIFO has underflowed. Acknowledge with SFTX
 };
-#if 0
-typedef union cc1101_iocfg0 {
-    uint8_t value;
-    struct {
-        unsigned  fifop_thr:7;
-        unsigned  cca_polarity:1;
-        unsigned  sfd_polarity:1;
-        unsigned  fifop_polarity:1;
-        unsigned  fifo_polarity:1;
-        unsigned  bcn_accept:1;
-        unsigned  reserved:4; // write as 0
-    } f;
-} cc1101_iocfg0_t;
-
-// TODO: make sure that we avoid wasting RAM
-static const cc1101_iocfg0_t cc1101_iocfg0_default = {.f.fifop_thr = 64, .f.cca_polarity = 0, .f.sfd_polarity = 0, .f.fifop_polarity = 0, .f.fifo_polarity = 0, .f.bcn_accept = 0, .f.reserved = 0};
-
-typedef union cc1101_iocfg1 {
-    uint16_t value;
-    struct {
-        unsigned  ccamux:5;
-        unsigned  sfdmux:5;
-        unsigned  hssd_src:3;
-        unsigned  reserved:3; // write as 0
-    } f;
-} cc1101_iocfg1_t;
-
-static const cc1101_iocfg1_t cc1101_iocfg1_default = {.value = 0};
-
-typedef union cc1101_fsctrl {
-    uint16_t value;
-    struct {
-        unsigned  freq:10;
-        unsigned  lock_status:1;
-        unsigned  lock_length:1;
-        unsigned  cal_running:1;
-        unsigned  cal_done:1;
-        unsigned  lock_thr:2;
-    } f;
-} cc1101_fsctrl_t;
-
-static const cc1101_fsctrl_t cc1101_fsctrl_default = {.f.lock_thr = 1, .f.freq = 357, .f.lock_status = 0, .f.lock_length = 0, .f.cal_running = 0, .f.cal_done = 0};
-
-typedef union cc1101_mdmctrl0 {
-    uint16_t value;
-    struct {
-        unsigned  preamble_length:4;
-        unsigned  autoack:1;
-        unsigned  autocrc:1;
-        unsigned  cca_mode:2;
-        unsigned  cca_hyst:3;
-        unsigned  adr_decode:1;
-        unsigned  pan_coordinator:1;
-        unsigned  reserved_frame_mode:1;
-        unsigned  reserved:2;
-    } f;
-} cc1101_mdmctrl0_t;
-
-static const cc1101_mdmctrl0_t cc1101_mdmctrl0_default = {.f.preamble_length = 2, .f.autocrc = 1, .f.cca_mode = 3, .f.cca_hyst = 2, .f.adr_decode = 1};
-
-typedef union cc1101_txctrl {
-    uint16_t value;
-    struct {
-        unsigned  pa_level:5;
-        unsigned reserved:1;
-        unsigned pa_current:3;
-        unsigned txmix_current:2;
-        unsigned txmix_caparray:2;
-        unsigned tx_turnaround:1;
-        unsigned txmixbuf_cur:2;
-    } f;
-} cc1101_txctrl_t;
-
-static const cc1101_txctrl_t cc1101_txctrl_default = {.f.pa_level = 31, .f.reserved = 1, .f.pa_current = 3, .f.tx_turnaround = 1, .f.txmixbuf_cur = 2};
-#endif
-
-#ifndef CC1101_DEF_CHANNEL
-#define CC1101_DEF_CHANNEL 11
-#endif
-
-#ifndef CC1101_DEF_RFPOWER
-#define CC1101_DEF_RFPOWER 31
-#endif
 
 //enum {
 //    CC1101_TX_PWR_MASK = 0x1f,
@@ -412,15 +329,18 @@ enum {
  */
 enum{
   CC1101_PA_PLUS_10 = 0xC0,
-  CC1101_PA_PLUS_5 = 0x85,
+  CC1101_PA_PLUS_5 = 0x84,
   CC1101_PA_PLUS_0 = 0x60,
-  CC1101_PA_MINUS_5 = 0x57,
-  CC1101_PA_MINUS_10 = 0x26,	
+  CC1101_PA_MINUS_10 = 0x34,	
+  CC1101_PA_MINUS_15 = 0x1d,
+  CC1101_PA_MINUS_20 = 0x0e,
+  CC1101_PA_MINUS_30 = 0x12,
 };
 
 #ifndef CC1101_PA
-//#define CC1101_PA CC1101_PA_PLUS_0
-#define CC1101_PA CC1101_PA_MINUS_10
+//#define CC1101_PA CC1101_PA_PLUS_10
+#define CC1101_PA CC1101_PA_PLUS_0
+//#define CC1101_PA CC1101_PA_MINUS_30
 #endif
 // End CC1101_433_MHz
 #elif (CC1101_MATCHING_NETWORK == CC1101_868_MHZ)
