@@ -51,6 +51,7 @@ generic configuration DemoSensorC() {
   provides interface Read<uint16_t>;
 }
 implementation {
-  components new VoltageC() as DemoSensor;
+  /*components new VoltageC() as DemoSensor;*/
+  components new PotentioMeterC() as DemoSensor;
   Read = DemoSensor;
 }
