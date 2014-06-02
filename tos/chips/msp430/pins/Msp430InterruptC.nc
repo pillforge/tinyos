@@ -53,6 +53,7 @@ implementation {
     atomic {
       call Interrupt.disable();
       call HplInterrupt.edge( rising );
+      call HplInterrupt.clear();
       call HplInterrupt.enable();
     }
     return SUCCESS;
