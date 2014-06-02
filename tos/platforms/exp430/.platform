@@ -3,7 +3,8 @@
 # @includes instead of -I's to @opts, otherwise the %T won't be processed
 # by ncc.
 
-push( @includes, qw(
+#push( @includes, qw(
+for (split(/\n/, <<'EOText'
   %P/hardware/adc
   %P/hardware/buttons
   %P/hardware/clock
@@ -16,6 +17,7 @@ push( @includes, qw(
   %T/chips/msp430/x5xxx/lpm
   %T/chips/msp430/x5xxx/timer
   %T/chips/msp430/x5xxx/usci-v2
+  %T/chips/msp430/x5xxx/usci-v2/i2c-sm
   %T/chips/msp430
   %T/chips/msp430/pins
   %T/chips/msp430/timer
@@ -65,8 +67,17 @@ push( @includes, qw(
   %T/lib/power
   %T/lib/printf
   %T/lib/diagmsg
+  %T/lib/gpio
 
-) );
+EOText
+)) {
+  s/\#.*$//;
+  s/^\s*//g;
+  s/\s*$//g;
+  push(@includes, $_) if $_;
+}
+
+#) );
 
 @opts = qw(
   -gcc=msp430-gcc

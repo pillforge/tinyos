@@ -57,7 +57,7 @@ implementation {
   command bool Get.get() { return call HplMsp430GeneralIO.get(); }
 
   command error_t Notify.enable() {
-    error_t rv;
+    /*error_t rv;*/
 
     call HplMsp430GeneralIO.makeInput();
     call HplMsp430GeneralIO.setResistor(MSP430_PORT_RESISTOR_PULLUP);
