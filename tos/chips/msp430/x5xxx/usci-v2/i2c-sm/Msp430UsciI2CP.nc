@@ -546,6 +546,8 @@ implementation {
     if (m_left == 1){
       uint8_t ifg = call Usci.getIfg();
       if (ifg & UCRXIFG){
+        if (m_flags & I2C_STOP)
+          call Usci.setTxStop();
         m_left--;
         m_buf[m_pos++] = call Usci.getRxbuf();
       }
