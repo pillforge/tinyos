@@ -69,4 +69,11 @@ typedef uint16_t tradio_size;
 #define SOFTWAREACK_TIMEOUT 2000
 #endif
 
+/**
+ * Make PACKET_LINK automaticaly enabled for Ieee154MessageC
+ */
+//#if !defined(TFRAMES_ENABLED) && !defined(PACKET_LINK)
+//#define PACKET_LINK
+//#endif
+
 #endif

@@ -1,6 +1,4 @@
-
-
-generic configuration HplRadioAlarmC() {
+configuration HplRadioAlarmC {
 
   provides interface Init;
   provides interface Alarm<T32khz,uint16_t> as Alarm32khz16;

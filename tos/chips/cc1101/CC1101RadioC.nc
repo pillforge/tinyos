@@ -224,12 +224,14 @@ implementation
   // -------- SoftwareAcknowledgement
 
   components new SoftwareAckLayerC();
+  components DiagMsgC;
   SoftwareAckLayerC.AckReceivedFlag -> MetadataFlagsLayerC.PacketFlag[unique(UQ_METADATA_FLAGS)];
   SoftwareAckLayerC.RadioAlarm -> RadioAlarmC.RadioAlarm[unique(UQ_RADIO_ALARM)];
   PacketAcknowledgements = SoftwareAckLayerC;
   SoftwareAckLayerC.Config -> RadioP;
   SoftwareAckLayerC.SubSend -> CsmaLayerC;
   SoftwareAckLayerC.SubReceive -> CsmaLayerC;
+  SoftwareAckLayerC.DiagMsg -> DiagMsgC;
 
   // -------- Carrier Sense
 

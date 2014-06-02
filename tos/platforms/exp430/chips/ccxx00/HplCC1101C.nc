@@ -40,7 +40,7 @@ configuration HplCC1101C {
 }
 implementation {
 
-  components HplMsp430GeneralIOC as IO, new Msp430UsciSpiB0C() as SpiC;
+  components HplMsp430GeneralIOC as IO, HplRadioSpiC as SpiC;
 
   // pins
   components new Msp430GpioC() as CSNM;
@@ -60,19 +60,24 @@ implementation {
   SpiByte = SpiC;
   SpiBlock = SpiC;
 
-  components HplRadioSpiP;
-  SpiC.Msp430UsciConfigure -> HplRadioSpiP;
-
   // capture
-  components Msp430TimerC as TimerC;
-  components new GpioCaptureC();
-  GpioCaptureC.Msp430TimerControl -> TimerC.Control2_A0;
-  GpioCaptureC.Msp430Capture -> TimerC.Capture2_A0;
-  GpioCaptureC.GeneralIO -> IO.Port23;
-  Gdo0Capture = GpioCaptureC;
+  /*components Msp430TimerC as TimerC;*/
+  /*components new GpioCaptureC();*/
+  /*GpioCaptureC.Msp430TimerControl -> TimerC.Control2_A0;*/
+  /*GpioCaptureC.Msp430Capture -> TimerC.Capture2_A0;*/
+  /*GpioCaptureC.GeneralIO -> IO.Port23;*/
+  /*Gdo0Capture = GpioCaptureC;*/
+  // SoftCapture is used instead since we don't have stringent timestamping requirements
+  // and because we are running out of timers (Timer2_A0 can now be used for TMilli)
+  components new SoftCaptureC();
+  components new Msp430InterruptC(), HplMsp430InterruptC as IOIntC;
+
+  Msp430InterruptC -> IOIntC.Port23;
+  SoftCaptureC.GpioInterrupt -> Msp430InterruptC;
+  Gdo0Capture = SoftCaptureC.GpioCapture;
 
   // alarm
-  components new Alarm32khz16C() as AlarmC;
+  components HplRadioAlarmC as AlarmC;
   Alarm = AlarmC;
   Init = AlarmC;
 

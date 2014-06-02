@@ -52,6 +52,7 @@ generic module SoftwareAckLayerC()
 
 		interface SoftwareAckConfig as Config;
 		interface PacketFlag as AckReceivedFlag;
+    interface DiagMsg;
 	}
 }
 
@@ -147,6 +148,16 @@ implementation
 	tasklet_async event message_t* SubReceive.receive(message_t* msg)
 	{
 		RADIO_ASSERT( state == STATE_ACK_WAIT || state == STATE_READY );
+
+#ifdef RADIO_DEBUG_MESSAGES
+    if( call DiagMsg.record() )
+    {
+      call DiagMsg.chr('s');
+      call DiagMsg.uint8(state);
+      call DiagMsg.uint8(call Config.requiresAckReply(msg) );
+      call DiagMsg.send();
+    }
+#endif
 
 		if( call Config.isAckPacket(msg) )
 		{
