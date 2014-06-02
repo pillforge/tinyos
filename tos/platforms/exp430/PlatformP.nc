@@ -55,7 +55,10 @@ noinit uint16_t boot_count;
 
 
 module PlatformP {
-  provides interface Init;
+  provides {
+    interface Init;
+    interface Platform;
+  }
   uses {
     interface Init as PlatformPins;
     interface Init as PlatformLeds;
@@ -69,8 +72,8 @@ module PlatformP {
 implementation {
 
   void uwait(uint16_t u) {
-    uint16_t t0 = TA0R;
-    while((TA0R - t0) <= u);
+    uint16_t t0 = TA2R;
+    while((TA2R - t0) <= u);
   }
 
   command error_t Init.init() {
@@ -81,6 +84,14 @@ implementation {
     call PlatformClock.init();  // Initializes UCS
     call PeripheralInit.init();
     return SUCCESS;
+  }
+
+  async command uint16_t Platform.usecsRaw() {
+    return TA1R;
+  }
+
+  async command uint16_t Platform.jiffiesRaw() {
+    return TA2R;
   }
 
   /***************** Defaults ***************/

@@ -455,7 +455,7 @@ module PlatformClockP {
      * MCLK is set to DCOCLK/1.   8 MHz
      * SMCLK is set to DCOCLK/1.  8 MHz.
      * DCO drives TA1 for TMicro and is set to provide 1us ticks.
-     * ACLK  drives TA0 for TMilli.
+     * ACLK  drives TA2 for TMilli.
      */
     UCSCTL4 = SELA__XT1CLK | SELS__DCOCLK | SELM__DCOCLK;
     UCSCTL5 = DIVA__1 | DIVS__1 | DIVM__1;

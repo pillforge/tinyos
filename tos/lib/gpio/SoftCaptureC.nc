@@ -53,11 +53,11 @@ generic configuration SoftCaptureC()
 implementation
 {
   components new SoftCaptureP();
-  components Counter32khzC;
+  components Counter32khz32C;
   
   GpioCapture = SoftCaptureP;
   GpioInterrupt = SoftCaptureP;
 
-  SoftCaptureP.Counter32khz32 -> Counter32khzC.Counter32khz32;
+  SoftCaptureP.Counter32khz32 -> Counter32khz32C;
 }
 
