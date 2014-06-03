@@ -51,7 +51,7 @@ typedef uint16_t tradio_size;
  * Ok, further hacks were required for deputy, I removed 00 from the
  * beginning and end to ba able to handle longer wait periods.
  */
-#define RADIO_ALARM_MICROSEC	0.03125
+#define RADIO_ALARM_MICROSEC	0.032768
 
 /**
  * The base two logarithm of the number of radio alarm ticks per one millisecond
@@ -65,8 +65,9 @@ typedef uint16_t tradio_size;
 #define CC1101_MATCHING_NETWORK CC1101_433_MHZ
 #endif
 
+/* Number of microseconds a sender waits for an acklowledgement */
 #ifndef SOFTWAREACK_TIMEOUT
-#define SOFTWAREACK_TIMEOUT 2000
+#define SOFTWAREACK_TIMEOUT 3000
 #endif
 
 /**

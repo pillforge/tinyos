@@ -268,6 +268,9 @@ implementation
       }
     } else if(state == STATE_BUSY_TX_2_RX_ON){
       // If GDO has asserted about sync byte being sent, we TX was successful, and txEnd should be set
+#ifdef RADIO_DEBUG
+      RADIO_ASSERT(txEnd);
+#endif
       if(!txEnd){
         // TX was unsuccessful
         txFailed = TRUE;
@@ -337,14 +340,13 @@ implementation
   }
 
 
-  inline cc1101_status_t getPacketStatus(){
+  inline cc1101_status_t getPacketStatus(uint8_t* pkt_status){
     cc1101_status_t status;
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
-    // For debugging using Logic Analyzer
-    burstRead(CC1101_PKTSTATUS, &status.value, 1);
-    call CSN.set(); // set CSN, just in clase it's not set
+    status = burstRead(CC1101_PKTSTATUS, pkt_status, 1);
+    call CSN.set(); 
     return status;
   }
 
@@ -410,7 +412,7 @@ implementation
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
     // For debugging using Logic Analyzer
-    burstRead(CC1101_PKTSTATUS, &pkt_status, 1);
+    getPacketStatus(&pkt_status);
     call CSN.set();
 
     /*status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE | CC1101_RXBYTES);*/
@@ -477,14 +479,26 @@ implementation
 
   inline cc1101_status_t waitForState(uint8_t st, uint8_t timeout) {
     cc1101_status_t status;
+    uint8_t pkt_status;
     uint8_t counter = 0;
     do {
       status = getStatus();
       counter++;
-      getPacketStatus();
+      getPacketStatus(&pkt_status);
     }while(status.state != st && counter < timeout);
     return status;
   }
+
+  inline uint8_t waitForCCA(uint8_t timeout) {
+    uint8_t pkt_status;
+    uint8_t counter = 0;
+    do {
+      getPacketStatus(&pkt_status);
+      counter++;
+    }while(!(pkt_status & 0x10) && counter < timeout);
+    return pkt_status;
+  }
+
   inline cc1101_status_t flushRxFifo() {
     strobe(CC1101_SFRX);
     strobe(CC1101_SRX);
@@ -842,6 +856,7 @@ implementation
     uint16_t time;
     /*uint8_t p;*/
     uint8_t length;
+    uint8_t pkt_status;
     uint8_t* data;
     /*uint16_t trials = 0;*/
     /*
@@ -851,10 +866,7 @@ implementation
      *timesync_relative_t timesync_relative;
      *uint32_t sfdTime;
      */
-    cc1101_status_t status;
-#ifdef RADIO_DEBUG
-    uint8_t sfd1, sfd2, sfd3, sfd4;
-#endif
+    volatile cc1101_status_t status;
 #ifdef RADIO_DEBUG_MESSAGES
 
     if( call DiagMsg.record() )
@@ -880,6 +892,11 @@ implementation
       strobe(CC1101_SFTX);
       return EBUSY;
     } else if(status.state == CC1101_STATE_CALIBRATE || status.state == CC1101_STATE_SETTLING)
+      return EBUSY;
+
+    // Before we start transimssion, we have to wait for CCA, otherwise the chip won't get into the TX state
+    pkt_status = waitForCCA(0xff);
+    if (!(pkt_status & 0x10))
       return EBUSY;
 
     // start transmission
@@ -915,24 +932,11 @@ implementation
     /*}*/
 
     atomic {
-#ifdef RADIO_DEBUG
-      sfd1 = call GDO0.get();
-#endif
-#ifdef RADIO_DEBUG
-      sfd2 = call GDO0.get();
-#endif
-
       cmd = CMD_TRANSMIT;
       call RadioAlarm.wait(TX_2_RX_TIME); // 32+16 symbol periods
       state = STATE_BUSY_TX_2_RX_ON;
       enableTransmitGdo();
-#ifdef RADIO_DEBUG
-      sfd3 = call GDO0.get();
-#endif
       /*call Gdo0Capture.captureFallingEdge();*/
-#ifdef RADIO_DEBUG
-      sfd4 = call GDO0.get();
-#endif
     }
     /*
      *while(TRUE){
@@ -949,13 +953,6 @@ implementation
      *}
      */
     /*enableTransmitGdo();*/
-
-#ifdef RADIO_DEBUG
-    RADIO_ASSERT(sfd1 == 0);
-    RADIO_ASSERT(sfd2 == 0);
-    RADIO_ASSERT(sfd3 == 0);
-    RADIO_ASSERT(sfd4 == 0);
-#endif
 
     //TODO: implement timesync
 /*
@@ -1106,7 +1103,7 @@ implementation
 
 #endif
 
-  inline void downloadMessage()
+  inline void downloadMessage() 
   {
     uint8_t fifo_length, fifo_length_end;
     uint8_t packet_length;
@@ -1317,8 +1314,12 @@ implementation
   // RX GDO0 (rising edge) or end of TX (falling edge)
   async event void Gdo0Capture.captured( uint16_t time )
   {
-    uint8_t gdo0_val;
+    volatile uint8_t gdo0_val;
     call Gdo0Capture.disable();
+    call Leds.led2Off();
+    call Leds.led2On();
+    call Leds.led2Off();
+    call Leds.led2On();
     call Leds.led2Off();
     call Leds.led2On();
     RADIO_ASSERT( ! rxGdo0 ); // assert that there's no nesting
@@ -1364,9 +1365,12 @@ implementation
     }
 #endif
 
+    call Leds.led2Off();
+    call Leds.led2On();
+    call Leds.led2Off();
+    call Leds.led2On();
     // do the rest of the processing
     call Tasklet.schedule();
-    call Leds.led2On();
     call Leds.led2Off();
   }
 
@@ -1390,7 +1394,7 @@ implementation
 
   tasklet_async event void Tasklet.run()
   {
-    uint8_t left_over;
+    /*uint8_t left_over;*/
 #ifdef RADIO_DEBUG_TASKLET
     if( call DiagMsg.record() )
     {
