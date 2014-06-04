@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2007, Vanderbilt University
  * All rights reserved.
@@ -73,8 +72,8 @@ typedef uint16_t tradio_size;
 /**
  * Make PACKET_LINK automaticaly enabled for Ieee154MessageC
  */
-//#if !defined(TFRAMES_ENABLED) && !defined(PACKET_LINK)
-//#define PACKET_LINK
-//#endif
+#if !defined(TFRAMES_ENABLED) && !defined(PACKET_LINK)
+#define PACKET_LINK
+#endif
 
 #endif
