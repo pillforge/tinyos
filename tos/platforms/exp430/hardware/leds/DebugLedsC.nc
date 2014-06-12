@@ -37,52 +37,49 @@
 
 #include "hardware.h"
 
-configuration PlatformLedsC {
+configuration DebugLedsC {
   provides {
-    interface Init;
     interface Leds;
   }
 }
 implementation {
   components new PlatformLedsP();
+  components PlatformC;
   Leds = PlatformLedsP;
-  Init = PlatformLedsP;
+  // Treat this as a peripheral
+  PlatformC.PeripheralInit -> PlatformLedsP; 
 
   components HplMsp430GeneralIOC as GeneralIOC;
 
   /* RED LED (D1) at P1.0 */
   components new Msp430GpioC() as Led0Impl;
-  Led0Impl -> GeneralIOC.Port10;
+  Led0Impl -> GeneralIOC.Port70;
   PlatformLedsP.Led0 -> Led0Impl;
 
   /* Yellow LED (D2) at P8.1 */
   components new Msp430GpioC() as Led1Impl;
-  Led1Impl -> GeneralIOC.Port81;
+  Led1Impl -> GeneralIOC.Port71;
   PlatformLedsP.Led1 -> Led1Impl;
 
   /* Green LED (D1) at P8.2 */
   components new Msp430GpioC() as Led2Impl;
-  Led2Impl -> GeneralIOC.Port82;
+  Led2Impl -> GeneralIOC.Port72;
   PlatformLedsP.Led2 -> Led2Impl;
 
   components new Msp430GpioC() as Led3Impl;
-  Led3Impl -> GeneralIOC.Port11;
+  Led3Impl -> GeneralIOC.Port73;
   PlatformLedsP.Led3 -> Led3Impl;
   
-  components new Msp430GpioC() as Led4Impl;
-  Led4Impl -> GeneralIOC.Port12;
+  components DummyIoP as Led4Impl;
   PlatformLedsP.Led4 -> Led4Impl;
   
-  components new Msp430GpioC() as Led5Impl;
-  Led5Impl -> GeneralIOC.Port13;
+  components DummyIoP as Led5Impl;
   PlatformLedsP.Led5 -> Led5Impl;
   
-  components new Msp430GpioC() as Led6Impl;
-  Led6Impl -> GeneralIOC.Port14;
+  components DummyIoP as Led6Impl;
   PlatformLedsP.Led6 -> Led6Impl;
   
-  components new Msp430GpioC() as Led7Impl;
-  Led7Impl -> GeneralIOC.Port15;
+  components DummyIoP as Led7Impl;
   PlatformLedsP.Led7 -> Led7Impl;
   
 }

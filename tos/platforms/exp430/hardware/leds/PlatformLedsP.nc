@@ -42,7 +42,7 @@
  * @author David Moss
  */
 
-module PlatformLedsP {
+generic module PlatformLedsP(){
   provides {
     interface Init;
     interface Leds;
