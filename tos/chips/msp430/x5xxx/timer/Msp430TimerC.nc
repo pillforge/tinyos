@@ -170,7 +170,7 @@ implementation {
 
 #if defined(__MSP430_HAS_T0A3__) || defined(__MSP430_HAS_T0A5__)
   components new Msp430TimerP( TA0IV_, TA0R_, TA0CTL_, TAIFG, TACLR, TAIE,
-			       TASSEL0, TASSEL1, FALSE ) as Msp430Timer0_A;
+			       TASSEL0, TASSEL1, TRUE ) as Msp430Timer0_A;
 
   Timer0_A = Msp430Timer0_A.Timer;
   Msp430Timer0_A.VectorTimerX0 -> Common.VectorTimer0_A0;
@@ -219,7 +219,7 @@ implementation {
 
 #if defined(__MSP430_HAS_T0B7__)
   components new Msp430TimerP( TB0IV_, TB0R_, TB0CTL_, TBIFG, TBCLR, TBIE,
-			       TBSSEL0, TBSSEL1, FALSE ) as Msp430Timer0_B;
+			       TBSSEL0, TBSSEL1, TRUE ) as Msp430Timer0_B;
 
   Timer0_B = Msp430Timer0_B.Timer;
   Msp430Timer0_B.VectorTimerX0 -> Common.VectorTimer0_B0;
@@ -280,7 +280,7 @@ implementation {
 
 #if defined(__MSP430_HAS_T1A2__) || defined(__MSP430_HAS_T1A3__) || defined(__MSP430_HAS_T1A5__)
   components new Msp430TimerP( TA1IV_, TA1R_, TA1CTL_, TAIFG, TACLR, TAIE,
-			       TASSEL0, TASSEL1, FALSE ) as Msp430Timer1_A;
+			       TASSEL0, TASSEL1, TRUE ) as Msp430Timer1_A;
 
   Timer1_A = Msp430Timer1_A.Timer;
   Msp430Timer1_A.VectorTimerX0 -> Common.VectorTimer1_A0;
@@ -331,7 +331,7 @@ implementation {
 
 #if defined(__MSP430_HAS_T2A3__)
   components new Msp430TimerP( TA2IV_, TA2R_, TA2CTL_, TAIFG, TACLR, TAIE,
-			       TASSEL0, TASSEL1, FALSE ) as Msp430Timer2_A;
+			       TASSEL0, TASSEL1, TRUE ) as Msp430Timer2_A;
 
   Timer2_A = Msp430Timer2_A.Timer;
   Msp430Timer2_A.VectorTimerX0 -> Common.VectorTimer2_A0;

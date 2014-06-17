@@ -264,7 +264,7 @@ implementation
         // in receive mode, enable GDO0 capture
         enableReceiveGdo();
       } else {
-        call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+        call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
       }
     } else if(state == STATE_BUSY_TX_2_RX_ON){
       // If GDO has asserted about sync byte being sent, we TX was successful, and txEnd should be set
@@ -273,7 +273,9 @@ implementation
 #endif
       if(!txEnd){
         // TX was unsuccessful
+        call Leds.led0Off();
         txFailed = TRUE;
+        call Gdo0Capture.disable();
       }
     }
     else
@@ -401,7 +403,6 @@ implementation
   inline cc1101_status_t readLengthFromRxBytes(uint8_t* lengthPtr)
   {
     cc1101_status_t status;
-    uint8_t pkt_status;
     uint8_t length1, length2;
 
     RADIO_ASSERT( call SpiResource.isOwner() );
@@ -411,14 +412,6 @@ implementation
     call CSN.set(); // set CSN, just in clase it's not set
     call CSN.clr(); // clear CSN, starting a multi-byte SPI command
 
-    // For debugging using Logic Analyzer
-    getPacketStatus(&pkt_status);
-    call CSN.set();
-
-    /*status.value = call SpiByte.write(CC1101_CMD_REGISTER_READ | CC1101_CMD_BURST_MODE | CC1101_RXBYTES);*/
-    /**lengthPtr = call SpiByte.write(0);*/
-
-    call CSN.clr();
     status = burstRead(CC1101_RXBYTES, &length1, 1);
     call CSN.set();
     do {
@@ -479,12 +472,12 @@ implementation
 
   inline cc1101_status_t waitForState(uint8_t st, uint8_t timeout) {
     cc1101_status_t status;
-    uint8_t pkt_status;
+    /*uint8_t pkt_status;*/
     uint8_t counter = 0;
     do {
       status = getStatus();
       counter++;
-      getPacketStatus(&pkt_status);
+      /*getPacketStatus(&pkt_status);*/
     }while(status.state != st && counter < timeout);
     return status;
   }
@@ -590,6 +583,10 @@ implementation
     /*waitChipRdyn();*/
     strobe(CC1101_SIDLE);
     waitForState(CC1101_STATE_IDLE, 0xff);
+    strobe(CC1101_SFRX);
+    waitForState(CC1101_STATE_IDLE, 0xff);
+    strobe(CC1101_SFTX);
+    waitForState(CC1101_STATE_IDLE, 0xff);
     strobe(CC1101_SRX);
     waitForState(CC1101_STATE_RX, 0xff);
     state = STATE_RX_ON;
@@ -688,7 +685,7 @@ implementation
       setChannel();
 
       if( state == STATE_RX_ON ) {
-        call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+        call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
         state = STATE_IDLE_2_RX_ON;
       }
       else
@@ -737,11 +734,12 @@ implementation
       // setChannel was ignored in SLEEP because the SPI was not working, so do it here
       /*setChannel();*/
 
-      // Flush anything that might be in the RX FIFO
+      // Flush anything that might be in the RX/TX FIFO
       strobe(CC1101_SFRX);
+      strobe(CC1101_SFTX);
       // start receiving
       strobe(CC1101_SRX);
-      call RadioAlarm.wait(IDLE_2_RX_ON_TIME); // 12 symbol periods
+      call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
       state = STATE_IDLE_2_RX_ON;
     }
     else if( (cmd == CMD_TURNOFF || cmd == CMD_STANDBY)
@@ -749,6 +747,9 @@ implementation
     {
       // disable GDO0 capture
       call Gdo0Capture.disable();
+      // Also if an interrupt occured during the turnOff process, rxGdo0 will be true so set it to false
+      // TODO: This however means we have actually received a packet. Shouldn't we process it?
+      rxGdo0 = FALSE;
 
       // stop receiving
       strobe(CC1101_SIDLE);
@@ -924,35 +925,19 @@ implementation
     writeTxFifo(data, length);
     call CSN.set();
 
-    // Check if in TX mode. If not in TX mode, CCA has failed
-    /*status = getStatus();*/
-    /*if (status.state != CC1101_STATE_TX){*/
-      /*resetRx();*/
-      /*return EBUSY;*/
-    /*}*/
-
     atomic {
       cmd = CMD_TRANSMIT;
-      call RadioAlarm.wait(TX_2_RX_TIME); // 32+16 symbol periods
+      // Assumes Manchester encoding
+      // 4 bytes - preamble
+      // 2 bytes - sync
+      // 2 bytes - crc
+      // 4 byte  - padding (just to be safe)
+      // length  - payload
+      call RadioAlarm.wait(TX_DATA_TIME*RADIO_ALARM_MICROSEC); 
       state = STATE_BUSY_TX_2_RX_ON;
       enableTransmitGdo();
-      /*call Gdo0Capture.captureFallingEdge();*/
+
     }
-    /*
-     *while(TRUE){
-     *  status = waitForState(CC1101_STATE_RX, 0xff);
-     *  if(status.state == CC1101_STATE_RX){
-     *    txEnd = TRUE;
-     *    break;
-     *  }
-     *  if(trials++ > 20){
-     *    // Transmission has failed
-     *    resetRx();
-     *    return EBUSY;
-     *  }
-     *}
-     */
-    /*enableTransmitGdo();*/
 
     //TODO: implement timesync
 /*
@@ -1471,11 +1456,16 @@ implementation
         RADIO_ASSERT(cmd == CMD_TRANSMIT);
 
         resetRx();
+        call Leds.led1Off();
+        call Leds.led1On();
         // a packet might have been received since the end of the transmission
         enableReceiveGdo();
+        call Leds.led1Off();
 
       } else
         RADIO_ASSERT(FALSE);
+
+      signal RadioSend.sendDone(FAIL);
     }
 
     if( rxGdo0 ) {

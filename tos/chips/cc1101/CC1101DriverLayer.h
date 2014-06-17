@@ -42,26 +42,12 @@ typedef struct cc1101_metadata_t
 } cc1101_metadata_t;
 
 enum cc1101_timing_enums {
-    CC1101_SYMBOL_TIME = 16, // 16us
-    IDLE_2_RX_ON_TIME = 12 * CC1101_SYMBOL_TIME,
-    PD_2_IDLE_TIME = 860, // .86ms
-    STROBE_TO_TX_ON_TIME = 12 * CC1101_SYMBOL_TIME,
-    // TX SFD delay is computed as follows:
-    // a.) STROBE_TO_TX_ON_TIME is required for preamble transmission to
-    // start after TX strobe is issued
-    // b.) the SFD byte is the 5th byte transmitted (10 symbol periods)
-    // c.) there's approximately a 25us delay between the strobe and reading
-    // the timer register
-    TX_SFD_DELAY = STROBE_TO_TX_ON_TIME + 10 * CC1101_SYMBOL_TIME - 25,
-    // TX SFD is captured in hardware
-    RX_SFD_DELAY = 0,
-
-    // TX_2_RX Time is the amount of time it takes for the CC1101 to send the preamble and sync word.
-    // Since these are configurable, it is difficult to calculate exactly what this should be. For now
-    // we just assume the worst case for 2.4Kbps with 32 bit preamble and 16 bits sync word. Experiments
-    // show values > 50ms.
-    TX_2_RX_TIME = 65000U,
+    // Ref CC1101 datasheet Table 34: Overall State Transition Times
+    // These values assume Fxosc of 26MHz and no PA ramping
+    IDLE_2_RX_ON_TIME = 800, // with calibration
 };
+
+#define TX_DATA_TIME ((12+64)*16e6/(CC1101_BAUD_RATE))
 
 enum cc1101_reg_access_enums {
     CC1101_CMD_REGISTER_MASK = 0x3f,
@@ -257,6 +243,28 @@ enum cc1101_config_reg_enums {
 //#define CC1101_BAUD CC1101_100K
 #define CC1101_BAUD CC1101_250K
 //#define CC1101_BAUD CC1101_500K
+#endif
+
+#if (CC1101_BAUD == CC1101_1_2K)
+  #define CC1101_BAUD_RATE 1200
+#elif (CC1101_BAUD == CC1101_2_4K)
+  #define CC1101_BAUD_RATE 2400
+#elif (CC1101_BAUD == CC1101_10K) 
+  #define CC1101_BAUD_RATE 10000
+#elif (CC1101_BAUD == CC1101_26K) 
+  #define CC1101_BAUD_RATE 26000
+#elif (CC1101_BAUD == CC1101_38_4K) 
+  #define CC1101_BAUD_RATE 38400
+#elif (CC1101_BAUD == CC1101_76_8K) 
+  #define CC1101_BAUD_RATE 76800
+#elif (CC1101_BAUD == CC1101_100K) 
+  #define CC1101_BAUD_RATE 100000
+#elif (CC1101_BAUD == CC1101_150K) 
+  #define CC1101_BAUD_RATE 150000
+#elif (CC1101_BAUD == CC1101_250K) 
+  #define CC1101_BAUD_RATE 250000
+#elif (CC1101_BAUD == CC1101_500K) 
+  #define CC1101_BAUD_RATE 500000
 #endif
 
 /**
