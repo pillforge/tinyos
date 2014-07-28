@@ -266,6 +266,12 @@ implementation
       } else {
         call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
       }
+    } else if (state == STATE_RX_WAIT_END_PKT){
+      // spurious GDO interrupt. Put radio back to RX ON
+      state = STATE_RX_ON;
+      cmd = CMD_NONE;
+      // in receive mode, enable GDO0 capture
+      enableReceiveGdo();
     } else if(state == STATE_BUSY_TX_2_RX_ON){
       // If GDO has asserted about sync byte being sent, we TX was successful, and txEnd should be set
 #ifdef RADIO_DEBUG
@@ -273,7 +279,7 @@ implementation
 #endif
       if(!txEnd){
         // TX was unsuccessful
-        call Leds.led0Off();
+        /*call Leds.led0Off();*/
         txFailed = TRUE;
         call Gdo0Capture.disable();
       }
@@ -858,6 +864,7 @@ implementation
     /*uint8_t p;*/
     uint8_t length;
     uint8_t pkt_status;
+    uint8_t gdo0_val;
     uint8_t* data;
     /*uint16_t trials = 0;*/
     /*
@@ -884,8 +891,18 @@ implementation
     }
 #endif
 
-    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd || ! call RadioAlarm.isFree())
+    gdo0_val = call GDO0.get();
+    if (!gdo0_val && state == STATE_RX_WAIT_END_PKT){
+      // If state == STATE_RX_WAIT_END_PKT and gdo0 is low, then the state is
+      // invalid and can be ignored. This could happen if a spurious GDO0
+      // interrupt occured.
+      call Leds.led0On();
+      call Leds.led0Off();
+      state = STATE_RX_ON;
+    }
+    if( cmd != CMD_NONE || (state != STATE_IDLE && state != STATE_RX_ON) || ! isSpiAcquired() || rxGdo0 || txEnd || ! call RadioAlarm.isFree()){
       return EBUSY;
+    }
 
     status = getStatus();
     if (status.state == CC1101_STATE_TXFIFO_UNDERFLOW){
@@ -1297,6 +1314,7 @@ implementation
 
 
   // RX GDO0 (rising edge) or end of TX (falling edge)
+  // Do not modify RadioAlarm here because it maybe owned by someone else.
   async event void Gdo0Capture.captured( uint16_t time )
   {
     volatile uint8_t gdo0_val;
@@ -1312,13 +1330,24 @@ implementation
 
     gdo0_val = call GDO0.get();
 
-    if(state == STATE_RX_ON) {
+    if(state == STATE_RX_ON || state == STATE_RX_WAIT_END_PKT) {
       if(gdo0_val){
         capturedTime = time;
         call Gdo0Capture.captureFallingEdge();
+        // Switch to this state so we don't start sending data
+        // This however means that if we miss the GDO0 assertion(for some
+        // reason) that the system will remain in this state, which will
+        // prevent TX. Thus, this state has to be invalided at the beginning of
+        // TX by checking if gdo0 is low. In other words, if state ==
+        // STATE_RX_WAIT_END_PKT and gdo0 is low, then the state is invalid and
+        // can be ignored.
+        state = STATE_RX_WAIT_END_PKT;
+
         /*call Leds.led0On();*/
         /*call Leds.led0Off();*/
-      }else{
+      }else if (state == STATE_RX_WAIT_END_PKT){
+        // check if state == STATE_RX_WAIT_END_PKT to gaurd against spurious
+        // GDO0 interrupts.
         rxGdo0 = TRUE;
         /*call Leds.led0On();*/
         /*call Leds.led0Off();*/
@@ -1327,8 +1356,6 @@ implementation
       }
     }else if(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON){
         txEnd = TRUE;
-        if(state == STATE_BUSY_TX_2_RX_ON)
-          call RadioAlarm.cancel(); // No need to wait for the timeout alarm
     } else {
       // received capture interrupt in an invalid state
       RADIO_ASSERT(FALSE);
@@ -1410,6 +1437,9 @@ implementation
 
         RADIO_ASSERT(state == STATE_TX_ON || state == STATE_BUSY_TX_2_RX_ON);
         RADIO_ASSERT(cmd == CMD_TRANSMIT);
+
+        if(state == STATE_BUSY_TX_2_RX_ON)
+          call RadioAlarm.cancel(); // No need to wait for the timeout alarm
 
         state = STATE_RX_ON;
         cmd = CMD_NONE;

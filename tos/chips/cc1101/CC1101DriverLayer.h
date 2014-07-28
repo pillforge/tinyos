@@ -47,6 +47,7 @@ enum cc1101_timing_enums {
     IDLE_2_RX_ON_TIME = 800, // with calibration
 };
 
+// Maximum time to wait for sending and receiving data
 #define TX_DATA_TIME ((12+64)*16e6/(CC1101_BAUD_RATE))
 
 enum cc1101_reg_access_enums {
