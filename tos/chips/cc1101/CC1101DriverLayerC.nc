@@ -136,7 +136,7 @@ implementation
   DriverLayerP.PppIpv6 -> PppIpv6C;
 #endif
 
-  /*components LedsC as LedsC;*/
-  components DebugLedsC as LedsC;
+  components LedsC as LedsC;
+  /*components DebugLedsC as LedsC;*/
   DriverLayerP.Leds -> LedsC;
 }

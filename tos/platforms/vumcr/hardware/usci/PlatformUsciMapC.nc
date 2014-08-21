@@ -43,6 +43,7 @@
 configuration PlatformUsciMapC {
 } implementation {
   components HplMsp430GeneralIOC as GIO;
+  components PlatformP;
 
   components Msp430UsciUartA1P as UartA1C;
   UartA1C.URXD -> GIO.UCA1RXD;
@@ -66,4 +67,5 @@ configuration PlatformUsciMapC {
   components Msp430UsciI2CB1P as I2CB1C;
   I2CB1C.SDA -> GIO.UCB1SDA;
   I2CB1C.SCL -> GIO.UCB1SCL;
+  I2CB1C.Platform -> PlatformP;
 }

@@ -50,13 +50,17 @@ msp430_usci_config_t msp430_usci_uart_exp430_config = {
 
   /* SLAU208 Table 34-4 8MHz 9600: UBR=833, BRS=2, BRF=0 */
   /*brw  833 => 9600*/
-  /*br0 : 68,*/
-  /*br1 : 3,*/
+  br0 : 68,
+  br1 : 3,
   /* SLAU208 Table 34-4 8MHz 9600: UBR=833, BRS=2, BRF=0 */
   /* brw 69 =>  115200*/
   /*br0 : 69,*/
-  br0 : 8,
-  br1 : 0,
+  /*br1 : 0,*/
+  /* brw 35 =>  230400*/
+  /*br0 : 34,*/
+  /*br1 : 0,*/
+  /*br0 : 8,*/
+  /*br1 : 0,*/
   mctl : UCBRF_0 | UCBRS_2
 };
 
