@@ -80,6 +80,7 @@ implementation
   DriverLayerP.CSN -> HplC.CSN;
   DriverLayerP.GDO0 -> HplC.GDO0;
   DriverLayerP.GDO2 -> HplC.GDO2;
+  DriverLayerP.RADIO_EN -> HplC.RADIO_EN;
 
   PacketTransmitPower = DriverLayerP.PacketTransmitPower;
   TransmitPowerFlag = DriverLayerP.TransmitPowerFlag;

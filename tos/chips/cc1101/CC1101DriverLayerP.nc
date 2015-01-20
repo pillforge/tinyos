@@ -58,6 +58,7 @@ module CC1101DriverLayerP
     interface GeneralIO as CSN;
     interface GeneralIO as GDO0;
     interface GeneralIO as GDO2;
+    interface GeneralIO as RADIO_EN;
     interface GpioCapture as Gdo0Capture;
 
     interface PacketFlag as TransmitPowerFlag;
@@ -558,6 +559,8 @@ implementation
   }
 
   inline void resetRadio() {
+    call RADIO_EN.set();
+    call BusyWait.wait(30);
     // Go through reset procedure
     call CSN.set();
     call BusyWait.wait(30);

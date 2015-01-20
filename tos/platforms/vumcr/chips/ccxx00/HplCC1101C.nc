@@ -47,16 +47,21 @@ implementation {
   components new Msp430GpioC() as CSNM;
   components new Msp430GpioC() as GDO0M;
   components new Msp430GpioC() as GDO2M;
-  components DummyIoP as RADIO_ENM;
+  components new Msp430GpioC() as RADIO_ENM;
 
+#ifdef OLD_BOARD
   CSNM -> IO.Port26;
+#else
+  CSNM -> IO.Port21;
+#endif
   GDO0M -> IO.Port23;
   GDO2M -> IO.Port24;
-  RADIO_EN = RADIO_ENM;
+  RADIO_ENM -> IO.Port17;
 
   CSN = CSNM;
   GDO0 = GDO0M;
   GDO2 = GDO2M;
+  RADIO_EN = RADIO_ENM;
 
   // spi	
   SpiResource = SpiC.Resource;

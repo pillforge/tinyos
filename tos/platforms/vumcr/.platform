@@ -8,6 +8,7 @@ push( @includes, qw(
   %P/hardware/leds
   %P/hardware/usci
   %P/hardware/clock
+  %P/chips/ccxx00
   %T/platforms/exp430/
   %T/platforms/exp430/hardware/adc
   %T/platforms/exp430/hardware/buttons
