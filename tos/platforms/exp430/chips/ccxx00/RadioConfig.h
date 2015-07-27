@@ -76,4 +76,9 @@ typedef uint16_t tradio_size;
 #define PACKET_LINK
 #endif
 
+/** 
+ * We don't need diagmsg to be compiled
+ */
+#define DIAGMSG_NONE
+
 #endif

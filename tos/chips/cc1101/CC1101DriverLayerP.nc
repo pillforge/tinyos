@@ -234,11 +234,11 @@ implementation
   inline cc1101_status_t strobe(uint8_t reg);
 
   /*----------------- ALARM -----------------*/
-  cc1101_status_t radio_status;
   tasklet_async event void RadioAlarm.fired()
   {
+    cc1101_status_t radio_status;
     if( state == STATE_IDLE_2_RX_ON ) {
-      status = getStatus();
+      radio_status = getStatus();
 #ifdef RADIO_DEBUG_STATE
       if( call DiagMsg.record() )
       {
@@ -255,12 +255,12 @@ implementation
         if(call GDO0.get())
           call DiagMsg.str("GDO0");
         call DiagMsg.str("st=");
-        call DiagMsg.uint8(status.value);
+        call DiagMsg.uint8(radio_status.value);
 
         call DiagMsg.send();
       }
 #endif
-      if (status.state == CC1101_STATE_RX){
+      if (radio_status.state == CC1101_STATE_RX){
         state = STATE_RX_ON;
         cmd = CMD_SIGNAL_DONE;
         // in receive mode, enable GDO0 capture
