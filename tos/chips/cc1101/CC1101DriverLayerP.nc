@@ -231,11 +231,12 @@ implementation
   inline cc1101_status_t getStatus();
   inline cc1101_status_t enableReceiveGdo();
   inline cc1101_status_t burstRead(uint8_t addr,uint8_t* data, uint8_t length);
+  inline cc1101_status_t strobe(uint8_t reg);
 
   /*----------------- ALARM -----------------*/
+  cc1101_status_t radio_status;
   tasklet_async event void RadioAlarm.fired()
   {
-    cc1101_status_t status;
     if( state == STATE_IDLE_2_RX_ON ) {
       status = getStatus();
 #ifdef RADIO_DEBUG_STATE
@@ -265,6 +266,7 @@ implementation
         // in receive mode, enable GDO0 capture
         enableReceiveGdo();
       } else {
+        strobe(CC1101_SRX);
         call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
       }
     } else if (state == STATE_RX_WAIT_END_PKT){
@@ -559,8 +561,12 @@ implementation
   }
 
   inline void resetRadio() {
+    // Turn Off radio if it's been on
+    call RADIO_EN.makeOutput();
+    call RADIO_EN.clr();
+    call BusyWait.wait(1000);
     call RADIO_EN.set();
-    call BusyWait.wait(30);
+    call BusyWait.wait(1000);
     // Go through reset procedure
     call CSN.set();
     call BusyWait.wait(30);
@@ -706,6 +712,7 @@ implementation
 
   inline void changeState()
   {
+    cc1101_status_t status;
 
 #ifdef RADIO_DEBUG_STATE
     if( call DiagMsg.record() )
@@ -743,9 +750,14 @@ implementation
       // setChannel was ignored in SLEEP because the SPI was not working, so do it here
       /*setChannel();*/
 
+      status = getStatus();
       // Flush anything that might be in the RX/TX FIFO
-      strobe(CC1101_SFRX);
-      strobe(CC1101_SFTX);
+      if (status.state == CC1101_STATE_IDLE) {
+        strobe(CC1101_SFRX);
+        call BusyWait.wait(1000);
+        strobe(CC1101_SFTX);
+        call BusyWait.wait(1000);
+      }
       // start receiving
       strobe(CC1101_SRX);
       call RadioAlarm.wait(IDLE_2_RX_ON_TIME*RADIO_ALARM_MICROSEC);
