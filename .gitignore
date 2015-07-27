@@ -8,3 +8,5 @@ build
 .gdb*
 TAGS
 tags
+
+doc/nesdoc

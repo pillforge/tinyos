@@ -71,6 +71,9 @@ case `uname` in
     ## extra subdir at the end, beceuase that's what the reset of scripts
     ## presume. This is a work-around and should be eliminated eventually.
     xcode_jdk=/Developer/SDKs/${pn}${pv}.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers
+    if ! [ -d "$xcode_jdk" ]; then
+      xcode_jdk=/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers
+    fi
     jhome=/Library/Java/Home
     ;;
 

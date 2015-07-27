@@ -1,4 +1,5 @@
 # -*- python -*-
+# -*- coding: utf-8 -*-
 # Copyright (c) 2005 Intel Corporation
 # All rights reserved.
 #
@@ -43,6 +44,7 @@ from nesdoc.utils import *
 from nesdoc.graph import generate_graph
 from nesdoc.html import *
 import os
+import codecs
 
 def check(x):
   if not x:
@@ -241,8 +243,8 @@ for x in interfacedefs.getElementsByTagName("interfacedef"):
   doc = creator.createDocument(None, None, None)
   copy = x.cloneNode(True)
   doc.appendChild(copy)
-  ifile = file(filename, "w")
-  doc.writexml(ifile)
+  ifile = file(filename, "wb")
+  doc.writexml(codecs.open(filename, 'wb', 'utf-8'), encoding='utf-8')
   doc.unlink()
   ifile.close()
 
@@ -292,7 +294,7 @@ for x in components.getElementsByTagName("component"):
       refd.appendChild(qnameidx[qname].cloneNode(True))
     
     doc.appendChild(copy)
-    ifile = file(filename, "w")
-    doc.writexml(ifile)
+    ifile = file(filename, "wb")
+    doc.writexml(codecs.open(filename, 'wb', 'utf-8'), encoding='utf-8')
     doc.unlink()
     ifile.close()

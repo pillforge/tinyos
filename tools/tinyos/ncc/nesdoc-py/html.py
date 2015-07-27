@@ -48,7 +48,7 @@ class Html:
     if self.at0:
       self.f.write(" " * self.ind)
       self.at0 = False
-    self.f.write(s)
+    self.f.write(s.encode('utf-8'))
 
   # print a string and end the line
   def pln(self, s):
