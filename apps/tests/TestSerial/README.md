@@ -1,7 +1,7 @@
-README for TestSerial
+##### README for TestSerial
 Author/Contact: tinyos-help@millennium.berkeley.edu
 
-Description:
+##### Description:
 
 TestSerial is a simple application that may be used to test that the
 TinyOS java toolchain can communicate with a mote over the serial
@@ -13,13 +13,19 @@ operates over the serial port.) Likewise, the mote also sends packets
 to the serial port at 1Hz. Upon reception of a packet, the java
 application prints the counter's value to standard out.
 
-Java Application Usage:
+##### Java Application Usage:
   java TestSerial [-comm <packetsource>]
 
   If not specified, the <packetsource> defaults to sf@localhost:9002 or
   to your MOTECOM environment variable (if defined).
 
-Python Usage:
+##### Python Application Usage
+
+````
+PYTHONPATH=$PYTHONPATH:$TOSROOT/support/sdk/python python TestSerial.py serial@/dev/ttyACM0:9600
+````
+
+##### Python Usage:
   tos-dump /dev/ttyUSB0 57600
 
 Tools:
