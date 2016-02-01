@@ -32,22 +32,22 @@
  * Author: Addisu Taddese
  */ 
  
-generic configuration AlarmAdcTMilli16C()
+generic configuration AlarmAdc16C()
 {
   provides interface Init;
   provides interface Alarm<TMilli,uint16_t>;
 }
 implementation
 {
-  components new Msp430TimerAdcC() as Msp430Timer;
+  components Msp430TimerC as Msp430Timer;
   components new Msp430AlarmC(TMilli) as Msp430Alarm;
 
   Init = Msp430Alarm;
   Alarm = Msp430Alarm;
 
-  Msp430Alarm.Msp430Timer -> Msp430Timer;
-  Msp430Alarm.Msp430TimerControl -> Msp430Timer;
-  Msp430Alarm.Msp430Compare -> Msp430Timer;
+  // Msp430Alarm.Msp430Timer -> Msp430Timer;
+  // Msp430Alarm.Msp430TimerControl -> Msp430Timer;
+  // Msp430Alarm.Msp430Compare -> Msp430Timer;
 }
 
 

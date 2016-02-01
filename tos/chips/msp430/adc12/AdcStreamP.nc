@@ -42,6 +42,7 @@
  * @author Jan Hauer <hauer@tkn.tu-berlin.de>
  */
 #include "Timer.h"
+#include "Msp430Adc12.h"
 
 module AdcStreamP @safe() {
   provides {

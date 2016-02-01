@@ -33,6 +33,8 @@
  * ========================================================================
  */
 
+#include "Msp430Adc12.h"
+
 module AdcP @safe() {
   provides {
     interface Read<uint16_t> as Read[uint8_t client];
