@@ -37,8 +37,9 @@ configuration DiagMsgC
 	provides interface DiagMsg;
 }
 
-implementation 
+implementation
 {
+
 #ifdef DIAGMSG_NONE
 
 components NoDiagMsgC;
@@ -50,7 +51,7 @@ components NoDiagMsgC;
 	{
 		AM_DIAG_MSG = 0xB1,
 	};
-	
+
 	components DiagMsgP;
 
 	DiagMsg = DiagMsgP.DiagMsg;
@@ -59,6 +60,7 @@ components NoDiagMsgC;
 	components new AMSenderC(AM_DIAG_MSG);
 #else
 	components new SerialAMSenderC(AM_DIAG_MSG) as AMSenderC;
+// #define DIAGMSG_SERIAL_START
 #ifdef DIAGMSG_SERIAL_START
 	components SerialStartC;
 #endif

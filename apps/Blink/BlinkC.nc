@@ -1,7 +1,7 @@
 // $Id: BlinkC.nc,v 1.6 2010-06-29 22:07:16 scipio Exp $
 
 /*									tab:4
- * Copyright (c) 2000-2005 The Regents of the University  of California.  
+ * Copyright (c) 2000-2005 The Regents of the University  of California.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,9 +34,9 @@
  * Copyright (c) 2002-2003 Intel Corporation
  * All rights reserved.
  *
- * This file is distributed under the terms in the attached INTEL-LICENSE     
+ * This file is distributed under the terms in the attached INTEL-LICENSE
  * file. If you do not find these files, copies can be found by writing to
- * Intel Research Berkeley, 2150 Shattuck Avenue, Suite 1300, Berkeley, CA, 
+ * Intel Research Berkeley, 2150 Shattuck Avenue, Suite 1300, Berkeley, CA,
  * 94704.  Attention:  Intel License Inquiry.
  */
 
@@ -69,13 +69,13 @@ implementation
     dbg("BlinkC", "Timer 0 fired @ %s.\n", sim_time_string());
     call Leds.led0Toggle();
   }
-  
+
   event void Timer1.fired()
   {
     dbg("BlinkC", "Timer 1 fired @ %s \n", sim_time_string());
     call Leds.led1Toggle();
   }
-  
+
   event void Timer2.fired()
   {
     dbg("BlinkC", "Timer 2 fired @ %s.\n", sim_time_string());

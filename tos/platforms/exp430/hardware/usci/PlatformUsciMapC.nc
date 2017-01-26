@@ -49,6 +49,10 @@ configuration PlatformUsciMapC {
   UartA1C.URXD -> GIO.UCA1RXD;
   UartA1C.UTXD -> GIO.UCA1TXD;
 
+  components Msp430UsciUartA0P as UartA0C;
+  UartA0C.URXD -> GIO.UCA0RXD;
+  UartA0C.UTXD -> GIO.UCA0TXD;
+
   components Msp430UsciSpiA0P as SpiA0C;
   SpiA0C.SIMO -> GIO.UCA0SIMO;
   SpiA0C.SOMI -> GIO.UCA0SOMI;

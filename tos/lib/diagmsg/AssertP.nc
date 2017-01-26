@@ -32,6 +32,8 @@
  * Author: Miklos Maroti
  */
 
+#define stk_size 3000
+
 module AssertP
 {
 	uses
@@ -43,12 +45,61 @@ module AssertP
 
 implementation
 {
+
+	char *stk_prt[stk_size];
+	uint16_t stk_ind = 0;
+	uint16_t prt_ind = 0;
+	uint8_t print_enable = 1;
+
+	task void send() {
+		if (print_enable) {
+			call Leds.led7On();
+		} else call Leds.led6On();
+		// PRT_T("sending");
+		if (prt_ind < stk_size) {
+			while (prt_t(stk_prt[prt_ind]) && ++prt_ind < stk_size);
+			if (prt_ind < stk_size) {
+				post send();
+			} else {
+				// PRT_T("no longer inner");
+			}
+		} else {
+			// PRT_T("no longer");
+		}
+	}
+
+	void f_stk_prt (char *inp) __attribute__((noinline)) @C() @spontaneous() {
+		atomic {
+			if (print_enable) {
+				stk_prt[stk_ind++] = inp;
+				if (stk_ind>=stk_size) {
+					print_enable = 0;
+					post send();
+					stk_ind = 0;
+					print_enable = 0;
+				}
+			}
+		}
+	}
+
+	bool prt_t(const char* inp) __attribute__((noinline)) @C() @spontaneous() {
+		// while (! call DiagMsg.record());
+		atomic {
+			if( call DiagMsg.record() ) {
+				call DiagMsg.str(inp);
+				call DiagMsg.send();
+				return TRUE;
+			}
+			return FALSE;
+		}
+	}
+
 	void assert(bool condition, const char* file, uint16_t line) __attribute__((noinline)) @C() @spontaneous()
 	{
 		if( ! condition )
 		{
 #ifdef ASSERT_LEDON
-			call Leds.led0On();
+			call Leds.led4Toggle();
 #endif
 
 			if( call DiagMsg.record() )

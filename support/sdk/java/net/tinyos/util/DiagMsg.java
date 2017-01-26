@@ -84,7 +84,8 @@ public class DiagMsg implements PacketListenerIF {
         if( packet[PACKET_TYPE_FIELD] == AM_DIAG_MSG ) {
             try 
             {
-            	System.out.println(timestamp.format(new java.util.Date()) + " " + decode(packet));
+                // System.out.println(timestamp.format(new java.util.Date()) + " " + decode(packet));
+                System.out.println(decode(packet));
             }
             catch(Exception e) 
             {
@@ -332,11 +333,11 @@ public class DiagMsg implements PacketListenerIF {
     
     protected void addStr(int len) throws Exception 
     {
-        line.append(delimiter + "\"");
+        // line.append(delimiter + "\"");
         
         while( --len >= 0 )
             line.append((char)getByte());
         
-        line.append('"');
+        // line.append('"');
     }
 }

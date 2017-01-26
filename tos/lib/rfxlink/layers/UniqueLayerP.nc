@@ -92,8 +92,11 @@ implementation
 
 	tasklet_async event message_t* SubReceive.receive(message_t* msg)
 	{
-		uint8_t idx = call Neighborhood.insertNode(call UniqueConfig.getSender(msg));
-		uint8_t dsn = call UniqueConfig.getSequenceNumber(msg);
+		uint8_t idx;
+		uint8_t dsn;
+
+		idx = call Neighborhood.insertNode(call UniqueConfig.getSender(msg));
+		dsn = call UniqueConfig.getSequenceNumber(msg);
 
 		if( call NeighborhoodFlag.get(idx) )
 		{

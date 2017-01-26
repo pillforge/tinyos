@@ -36,12 +36,12 @@
 
 module DiagMsgP
 {
-	provides 
+	provides
 	{
 		interface DiagMsg;
 	}
 
-	uses 
+	uses
 	{
 		interface AMSend;
 		interface Packet;
@@ -103,8 +103,8 @@ implementation
 	};
 
 /*
-	The format of the payload is as follows: 
-	
+	The format of the payload is as follows:
+
 	Each value has an associated data type descriptor. The descriptor takes 4-bits,
 	and two descriptors are packed into one byte. The double-descriptor is followed
 	by the data bytes needed to store the corresponding value. Two sample layouts are:
@@ -114,19 +114,42 @@ implementation
 
 	where D1, D2, D3 denotes the data type descriptors, and V1, V2 and V3
 	denotes the bytes where the corresponding values are stored. If there is an odd
-	number of data descriptors, then a zero data descriptor <code>TYPE_END</code> 
+	number of data descriptors, then a zero data descriptor <code>TYPE_END</code>
 	is inserted.
 
 	Each data type (except arrays) uses a fixed number of bytes to store the value.
 	For arrays, the first byte of the array holds the data type of the array (higer
-	4 bits) and the length of the array (lower 4 bits). The actual data follows 
+	4 bits) and the length of the array (lower 4 bits). The actual data follows
 	this first byte.
 */
+	// int debug = 0;
+	void prt_state (char *loc) {
+		// if (debug) {
+		// 	atomic {
+		// 		printf("in: %s: ", loc);
+		// 		switch (state) {
+		// 			case STATE_READY: printf("STATE_READY\n");
+		// 			break;
+		// 			case STATE_RECORDING_FIRST: printf("STATE_RECORDING_FIRST\n");
+		// 			break;
+		// 			case STATE_RECORDING_SECOND: printf("STATE_RECORDING_SECOND\n");
+		// 			break;
+		// 			case STATE_MSG_FULL: printf("STATE_MSG_FULL\n");
+		// 			break;
+		// 			case STATE_BUFFER_FULL: printf("STATE_BUFFER_FULL\n");
+		// 			break;
+		// 		}
+		// 	}
+		// }
+	}
 
 	async command bool DiagMsg.record()
 	{
+		prt_state("DiagMsg.record");
 		atomic
 		{
+			// printf("state: %d\n", state);
+			// printf("deg: %d\n", DIAGMSG_RECORDED_MSGS);
 			// currently recording or no more space
 			if( state != STATE_READY )
 				return FALSE;
@@ -140,33 +163,42 @@ implementation
 
 	/**
 	 * Allocates space in the message for <code>size</code> bytes
-	 * and sets the type information to <code>type</code>. 
-	 * Returns the index in <code>msg.data</code> where the data 
+	 * and sets the type information to <code>type</code>.
+	 * Returns the index in <code>msg.data</code> where the data
 	 * should be stored or <code>-1</code> if no more space is avaliable.
 	 */
 	int8_t allocate(uint8_t size, uint8_t type)
 	{
 		int8_t ret = -1;
 
+		prt_state("DiagMsg.record_allbeg");
+
 		if( state == STATE_RECORDING_FIRST )
 		{
 			if( nextData + 1 + size <= TOSH_DATA_LENGTH )
 			{
+				prt_state("DiagMsg.allocate1");
 				state = STATE_RECORDING_SECOND;
+				prt_state("DiagMsg.allocate1'");
 
 				prevType = nextData++;
 				((uint8_t*) &(recording->data))[prevType] = type;
 				ret = nextData;
 				nextData += size;
 			}
-			else
+			else {
+				prt_state("DiagMsg.allocate2");
 				state = STATE_MSG_FULL;
+				prt_state("DiagMsg.allocate3");
+			}
 		}
 		else if( state == STATE_RECORDING_SECOND )
 		{
 			if( nextData + size <= TOSH_DATA_LENGTH )
 			{
+				prt_state("DiagMsg.record4");
 				state = STATE_RECORDING_FIRST;
+				prt_state("DiagMsg.record5");
 
 				((uint8_t*) &(recording->data))[prevType] += (type << 4);
 				ret = nextData;
@@ -200,7 +232,7 @@ implementation
 			memcpy(&(recording->data[start + 1]), data, size*len);
 		}
 	}
-	
+
 #define IMPLEMENT(NAME, TYPE, TYPE2) \
 	async command void DiagMsg.NAME(TYPE value) { copyData(sizeof(TYPE), TYPE2, &value); } \
 	async command void DiagMsg.NAME##s(const TYPE *value, uint8_t len) { copyArray(sizeof(TYPE), TYPE2, value, len); }
@@ -224,7 +256,7 @@ implementation
 		int8_t len = 0;
 		while( str[len] != 0 && len < 15 )
 			++len;
-		
+
 		call DiagMsg.chrs(str, len);
 	}
 
@@ -245,7 +277,7 @@ implementation
 
 		atomic msg = sending;
 
-		// if the stack is not started, then drop the message 
+		// if the stack is not started, then drop the message
 		// (cannot spin with tasks becasue we might be in software or hardware init)
 		if( call AMSend.send(DIAGMSG_BASE_STATION, msg, getPayloadLength(msg)) != SUCCESS )
 			atomic sending = 0;
@@ -262,6 +294,7 @@ implementation
 
 	async command void DiagMsg.send()
 	{
+		prt_state("DiagMsg.send");
 		// no message recorded
 		if( state == STATE_READY )
 			return;
@@ -275,9 +308,10 @@ implementation
 			{
 				sending = recording;
 				retries = DIAGMSG_RETRY_COUNT;
+				prt_state("DiagMsg.send sending");
 				post send();
 			}
-	
+
 			recording = nextPointer(recording);
 
 			if( recording == sending )
@@ -289,33 +323,34 @@ implementation
 
 	event void AMSend.sendDone(message_t* p, error_t error)
 	{
-		atomic
-		{
+		atomic {
 			// retry if not successful
-			if( error != SUCCESS && --retries > 0 )
+			if( error != SUCCESS && --retries > 0 ) {
 				post send();
-			else
-			{
+			} else {
+				// if( state == STATE_BUFFER_FULL ) {
+				// 	state = STATE_READY;
+				// }
 				p = nextPointer(sending);
-				if( p != recording )
-				{
+				if( p != recording ) {
 					sending = p;
 					retries = DIAGMSG_RETRY_COUNT;
 					post send();
-				}
-				else
-				{
+				} else {
 					sending = 0;
-
-					if( state == STATE_BUFFER_FULL )
-					{
+					if( state == STATE_BUFFER_FULL ) {
 						state = STATE_READY;
-						if( call DiagMsg.record() )
-						{
-							call DiagMsg.str("DiagMsgOverflow");
-							call DiagMsg.send();
-						}
 					}
+
+					// if( state == STATE_BUFFER_FULL )
+					// {
+					// 	state = STATE_READY;
+					// 	// if( call DiagMsg.record() )
+					// 	// {
+					// 	// 	call DiagMsg.str("DiagMsgOverflow");
+					// 	// 	call DiagMsg.send();
+					// 	// }
+					// }
 				}
 			}
 		}

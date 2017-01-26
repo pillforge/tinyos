@@ -79,6 +79,7 @@ typedef uint16_t tradio_size;
 /** 
  * We don't need diagmsg to be compiled
  */
-#define DIAGMSG_NONE
+// #define DIAGMSG_NONE
+
 
 #endif

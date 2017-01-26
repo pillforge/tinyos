@@ -42,7 +42,11 @@
 #else
 
 	void assert(bool condition, const char* file, uint16_t line);
-	#define ASSERT(COND) assert(COND, __FILE__, __LINE__)
+  #define ASSERT(COND) assert(COND, __FILE__, __LINE__)
+  bool prt_t(const char* inp);
+  #define PRT_T(INP) prt_t(INP)
+  void f_stk_prt (char *inp);
+
 
 #endif
 
